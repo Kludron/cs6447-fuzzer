@@ -1,1 +1,3 @@
-# cs6447-fuzzer
+# COMP6447 Fuzzer
+
+## 
