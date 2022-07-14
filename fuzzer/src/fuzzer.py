@@ -118,11 +118,16 @@ if __name__ == '__main__':
         print("Failed to open file/detect input type")
     elif type == TYPE_CSV:
         print("Detected CSV")
+        CSV_Fuzz.fuzz()
     elif type == TYPE_JSON:
         print("Detected JSON")
+        JSON_Fuzz.fuzz()
     elif type == TYPE_XML:
         print("Detected XML")
+        XML_Fuzz.fuzz()
     elif type == TYPE_PLAINTEXT:
         print("Detected Plaintext")
+        Plaintext_Fuzz.fuzz()
     elif type == TYPE_JPG:
         print("Detected JPG")
+        JPG_Fuzz.fuzz()
