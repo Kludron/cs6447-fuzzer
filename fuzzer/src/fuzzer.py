@@ -52,21 +52,34 @@ class XML_Fuzz(Fuzz):
             return True
         except ElementTree.ParseError:
             return False
+
+
+
+class Plaintext_Fuzz(Fuzz):
+    def __init__(self, input):  
+        super().__init__(input)
+
+class JPG_Fuzz(Fuzz):
+    def __init__(self, input):  
+        super().__init__(input)
+        
+
 def checkType(filename):
     try:
         fp = open(filename, 'r')
         inputTxt = fp.read().strip()
-        # print(inputTxt)
         if (CSV_Fuzz(inputTxt).checkType()):
             return TYPE_CSV
-        if (JSON_Fuzz(inputTxt).checkType()):
+        elif (JSON_Fuzz(inputTxt).checkType()):
             return TYPE_JSON
-        if (XML_Fuzz(inputTxt).checkType()):
+        elif (XML_Fuzz(inputTxt).checkType()):
             return TYPE_XML
         else:
-            return TYPE_FAIL
+            return TYPE_PLAINTEXT
     except IOError:
         return TYPE_FAIL
+    except:
+        return TYPE_JPG
 
 
 if __name__ == '__main__':
@@ -82,3 +95,7 @@ if __name__ == '__main__':
         print("Detected JSON")
     elif type == TYPE_XML:
         print("Detected XML")
+    elif type == TYPE_PLAINTEXT:
+        print("Detected Plaintext")
+    elif type == TYPE_JPG:
+        print("Detected JPG")
