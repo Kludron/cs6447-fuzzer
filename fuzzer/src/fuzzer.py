@@ -2,6 +2,7 @@
 import sys
 import json
 import xml.etree.ElementTree as ElementTree
+from numpy import void
 from pwn import *
 
 TYPE_FAIL = -1
@@ -17,6 +18,11 @@ class Fuzz():
         self.input = input
     def checkType(self):
         return False
+    def mutate():
+        pass
+    def fuzz():
+        pass
+        
 
 # CSV Fuzzer
 class CSV_Fuzz(Fuzz):
@@ -30,6 +36,10 @@ class CSV_Fuzz(Fuzz):
             if line.count(",") != first_row_commas or first_row_commas == 0:
                 return False
         return True
+    def mutate():
+        pass
+    def fuzz():
+        pass
 
 # JSON Fuzzer
 class JSON_Fuzz(Fuzz):
@@ -41,6 +51,10 @@ class JSON_Fuzz(Fuzz):
             return True
         except ValueError:
             return False
+    def mutate():
+        pass
+    def fuzz():
+        pass
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -52,16 +66,29 @@ class XML_Fuzz(Fuzz):
             return True
         except ElementTree.ParseError:
             return False
+    def mutate():
+        pass
+    def fuzz():
+        pass
 
-
-
+# Plaintext Fuzzer. No need to overwrite checkType()
 class Plaintext_Fuzz(Fuzz):
     def __init__(self, input):  
         super().__init__(input)
+    def mutate():
+        pass
+    def fuzz():
+        pass
 
+# JPG Fuzzer. No need to overwrite checkType()
 class JPG_Fuzz(Fuzz):
     def __init__(self, input):  
         super().__init__(input)
+    # I'm guessing we need to use bit flipping for this one
+    def mutate():
+        pass
+    def fuzz():
+        pass
         
 
 def checkType(filename):
