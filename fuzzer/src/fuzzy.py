@@ -23,14 +23,20 @@ counter_semaphore = threading.Semaphore()
 
 
 def randomword(length):
-   letters = string.ascii_lowercase
-   return ''.join(random.choice(letters) for i in range(length))
+    """
+    Random string generator to act as a simple fuzzer engine
+    Can be removed when we have fuzzer engines for the different
+    file formats."""
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
 
 
 def test(tester, program):
+    """
+    Tester function takes mutations from queue and runs them again binary.
+    """
     global counter
     while True:
-
         try:
             fuzz = q1.get()
         except queue.Empty:
@@ -41,14 +47,20 @@ def test(tester, program):
                 counter += 1
                 counter_semaphore.release()
                 subprocess.run(program, input=fuzz, check=True, text=True)
+            #Perform basic exit code monitoring of binary
             except subprocess.CalledProcessError:
-                #Update this to record input and stop
+                #######################################
+                #Update this to record input that crahs binary and exit fuzzer
+                #######################################
                 pass
             else:
                 pass
 
 
 def fuzz(generator, seed):
+    """
+    Fuzzer function generates mutations and places mutations on to the queue
+    """
     count = 1
     while count < MAX_TESTS:
         try:
@@ -76,16 +88,17 @@ if __name__ == '__main__':
         print(f"Seed fie {seed} not found")
         quit()
 
-    # Create testers
+    # Create testers threads
     for i in range(TESTERS):
         x = threading.Thread(target=test, daemon=True, args=(i, program))
         x.start()
 
-    # Create fuzzer
+    # Create fuzzer threads
     for i in range(FUZZERS):
         x = threading.Thread(target=fuzz, daemon=True, args=(i, seed))
         x.start()
 
+    #Create monitoring output
     curr_count = 0
     prev_count = 0
     start_time = time.time()
@@ -95,17 +108,26 @@ if __name__ == '__main__':
     total_rate = 0
     total_time = 0
     os.system("clear")
-    print(f"Binary: {program}\nRun time: 0:00:00\nTotal tests: {curr_count}\nQueue Length: {q1.qsize()}\nRecent Rate: {curr_rate}/sec\nOverall Rate: {total_rate}/sec")
-
+    print(  f"{'Binary Name:' : <17}{program}\n"
+            f"{'Run time:' : <16}{'0:00:00' : >8}\n"
+            f"{'Total tests:' : <16}{curr_count : >8}\n"
+            f"{'Queue Length:' : <16}{q1.qsize() : >8}\n"
+            f"{'Current Rate:' : <16}{curr_rate : >8} tests/sec\n"
+            f"{'Overall Rate:' : <16}{total_rate : >8} tests/sec")
     while True:
         if prev_time != 0:
             curr_time = time.time()
             curr_count = counter
-            total_time = datetime.timedelta(seconds =round(curr_time - start_time))
+            total_time = str(datetime.timedelta(seconds =round(curr_time - start_time)))
             curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
             total_rate = round(curr_count/(curr_time - start_time))
             os.system("clear")
-            print(f"Binary: {program}\nRun time: {total_time}\nTotal tests: {curr_count}\nQueue Length: {q1.qsize()}\nRecent Rate: {curr_rate}/sec\nOverall Rate: {total_rate}/sec")
+            print(  f"{'Binary Name:' : <17}{program}\n"
+                    f"{'Run time:' : <16}{total_time : >8}\n"
+                    f"{'Total tests:' : <16}{curr_count : >8}\n"
+                    f"{'Queue Length:' : <16}{q1.qsize() : >8}\n"
+                    f"{'Current Rate:' : <16}{curr_rate : >8} tests/sec\n"
+                    f"{'Overall Rate:' : <16}{total_rate : >8} tests/sec")
         prev_time = curr_time
         prev_count = curr_count
         time.sleep(10)
