@@ -9,6 +9,7 @@ import sys
 import os.path
 import subprocess
 import datetime
+import os
 
 QUEUE_SIZE = 1000
 MAX_TESTS = 1000000000
@@ -18,7 +19,7 @@ FUZZERS = 1
 
 q1 = queue.Queue(maxsize=QUEUE_SIZE)
 counter = 0
-count_sem = threading.Semaphore()
+counter_semaphore = threading.Semaphore()
 
 
 def randomword(length):
@@ -36,9 +37,9 @@ def test(tester, program):
             pass
         else:
             try:
-                count_sem.acquire()
+                counter_semaphore.acquire()
                 counter += 1
-                count_sem.release()
+                counter_semaphore.release()
                 subprocess.run(program, input=fuzz, check=True, text=True)
             except subprocess.CalledProcessError:
                 #Update this to record input and stop
@@ -91,6 +92,11 @@ if __name__ == '__main__':
     curr_time = start_time
     prev_time = 0
     curr_rate = 0
+    total_rate = 0
+    total_time = 0
+    os.system("clear")
+    print(f"Binary: {program}\nRun time: 0:00:00\nTotal tests: {curr_count}\nQueue Length: {q1.qsize()}\nRecent Rate: {curr_rate}/sec\nOverall Rate: {total_rate}/sec")
+
     while True:
         if prev_time != 0:
             curr_time = time.time()
@@ -98,7 +104,8 @@ if __name__ == '__main__':
             total_time = datetime.timedelta(seconds =round(curr_time - start_time))
             curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
             total_rate = round(curr_count/(curr_time - start_time))
-            print(f"Running: {total_time}\nTests: {curr_count}\nQueue Length: {q1.qsize()}\nRecent Rate: {curr_rate}/sec\nOverall Rate: {total_rate}/sec\n----")
+            os.system("clear")
+            print(f"Binary: {program}\nRun time: {total_time}\nTotal tests: {curr_count}\nQueue Length: {q1.qsize()}\nRecent Rate: {curr_rate}/sec\nOverall Rate: {total_rate}/sec")
         prev_time = curr_time
         prev_count = curr_count
         time.sleep(10)
