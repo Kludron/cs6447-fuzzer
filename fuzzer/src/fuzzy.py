@@ -33,7 +33,7 @@ def randomword(length):
     return ''.join(random.choice(letters) for i in range(length))
 
 
-def test(tester, program):
+def test(tester, program:str):
     """
     Tester function takes mutations from queue and runs them again binary.
     """
@@ -74,7 +74,6 @@ def fuzz(generator, seed):
             count += 1
 
 def monitor(refresh_time=2):
-
     # Set defaults
     curr_count = 0
     prev_count = 0
@@ -85,8 +84,10 @@ def monitor(refresh_time=2):
     total_rate = 0
     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
 
+    # Start monitoring loop
     while True:
         if prev_time != 0:
+            # Create the table
             table = PrettyTable([
                 "Binary Name",
                 "Run Time",
@@ -95,7 +96,6 @@ def monitor(refresh_time=2):
                 "Current Rate",
                 "Overall Rate"
             ])
-
             table.add_row([
                 program,
                 total_time,
@@ -120,7 +120,7 @@ def monitor(refresh_time=2):
             #     {'Current Rate:' : <16}{curr_rate : >8} tests/sec
             #     {'Overall Rate:' : <16}{total_rate : >8} tests/sec
             # """)
-            if sys.platform == 'linux' or sys.platform == 'linux2' or sys.platform == 'darwin':
+            if sys.platform == 'linux' or sys.platform == 'darwin':
                 os.system("clear")
             elif sys.platform == 'win32':
                 os.system("cls")

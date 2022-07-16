@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+
+# COMP6447 Fuzzer
+
+from utils import *
+from harness import Harness
+
+TESTBINARY='tests/csv1'
+TESTSEED='tests/csv1.txt'
+
+def print_type(file):
+    val = checkType(file)
+    if val == TYPE_FAIL:
+        print("Failed to open file/detect input type")
+    elif val == TYPE_CSV:
+        print("Detected CSV")
+        CSV_Fuzz.fuzz()
+    elif val == TYPE_JSON:
+        print("Detected JSON")
+        JSON_Fuzz.fuzz()
+    elif val == TYPE_XML:
+        print("Detected XML")
+        XML_Fuzz.fuzz()
+    elif val == TYPE_PLAINTEXT:
+        print("Detected Plaintext")
+        Plaintext_Fuzz.fuzz()
+    elif val == TYPE_JPG:
+        print("Detected JPG")
+        JPG_Fuzz.fuzz()
+
+def run(program, seed):
+    print_type(seed)
+    harness = Harness(program, seed)
+    harness.monitor()
+
+if __name__ == '__main__':
+    argc = len(sys.argv)
+    if argc < 3:
+        usage = f"{sys.argv[0]} <binary file> <seed file>"
+        print(usage)
+    else:
+        run(sys.argv[1], sys.argv[2])

@@ -1,4 +1,4 @@
-# COMP6447 Fuzzer
+# Utilities for COMP6447 Fuzzer
 import sys
 import json
 import xml.etree.ElementTree as ElementTree
