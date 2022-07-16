@@ -22,7 +22,6 @@ class Fuzz():
         pass
     def fuzz():
         pass
-        
 
 # CSV Fuzzer
 class CSV_Fuzz(Fuzz):
@@ -108,6 +107,22 @@ def checkType(filename):
     except:
         return TYPE_JPG
 
+def getType(filename) -> Fuzz or str:
+    try:
+        fp = open(filename, 'r')
+        inputTxt = fp.read().strip()
+        if (CSV_Fuzz(inputTxt).checkType()):
+            return CSV_Fuzz(inputTxt)
+        elif (JSON_Fuzz(inputTxt).checkType()):
+            return JSON_Fuzz(inputTxt)
+        elif (XML_Fuzz(inputTxt).checkType()):
+            return XML_Fuzz(inputTxt)
+        else:
+            return Plaintext_Fuzz(inputTxt)
+    except IOError:
+        return TYPE_FAIL
+    except:
+        return JPG_Fuzz(inputTxt)
 
 if __name__ == '__main__':
     print("Sample input: ", sys.argv[1])

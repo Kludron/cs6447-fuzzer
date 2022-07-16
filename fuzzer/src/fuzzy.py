@@ -111,20 +111,14 @@ def monitor(refresh_time=2):
             total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
             curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
             total_rate = round(curr_count/(curr_time - start_time))
+            
             # Print to screen
-            # print(f"""
-            #     {'Binary Name:'  : <17}{program}
-            #     {'Run time:'     : <16}{total_time : >8}
-            #     {'Total tests:'  : <16}{curr_count : >8}
-            #     {'Queue Length:' : <16}{q1.qsize() : >8}
-            #     {'Current Rate:' : <16}{curr_rate : >8} tests/sec
-            #     {'Overall Rate:' : <16}{total_rate : >8} tests/sec
-            # """)
             if sys.platform == 'linux' or sys.platform == 'darwin':
                 os.system("clear")
             elif sys.platform == 'win32':
                 os.system("cls")
             print(table)
+
         prev_time = curr_time
         prev_count = curr_count
         time.sleep(refresh_time)

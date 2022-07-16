@@ -11,9 +11,11 @@ import time
 
 from prettytable import PrettyTable
 
+from utils import Fuzz
+
 class Harness():
 
-    def __init__(self, program, seed) -> None:
+    def __init__(self, program: str, seed: str, fuzzer: Fuzz) -> None:
 
         self.program = program
         self.seed = seed
@@ -30,6 +32,8 @@ class Harness():
 
         self.isStarted = False
         self.s_semaphore = Semaphore()
+
+        self.fuzzer = fuzzer
 
     def start(self) -> None:
         # Check if the harness has already been started
@@ -79,7 +83,7 @@ class Harness():
                     subprocess.run(self.program, input=fuzz, check=True, text=True, stdout=self.LOGFILE)
                 except subprocess.CalledProcessError:
                     #######################################
-                    #Update this to record input that crashes binary and exit fuzzer
+                    # Update this to record input that crashes binary and exit fuzzer
                     #######################################
                     pass
                 else:
@@ -97,16 +101,16 @@ class Harness():
         #     except Full:
         #         pass
 
-        count = 1
-        while count < self.MAX_TESTS:
-            try:
-                #Replace this with fuzzer content generation
-                string = self.__randomword(8)
-                self.queue.put(string)
-            except Full:
-                pass
-            else:
-                count += 1
+        # count = 1
+        # while count < self.MAX_TESTS:
+        #     try:
+        #         # Replace this with fuzzer content generation
+        #         string = self.__randomword(8)
+        #         self.queue.put(string)
+        #     except Full:
+        #         pass
+        #     else:
+        #         count += 1
 
     def monitor(self, refresh_time=2) -> None:
         self.start()

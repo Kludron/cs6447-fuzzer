@@ -30,8 +30,12 @@ def print_type(file):
 
 def run(program, seed):
     print_type(seed)
-    harness = Harness(program, seed)
-    harness.monitor()
+    fuzzer = getType(seed)
+    if not fuzzer == TYPE_FAIL:
+        harness = Harness(program, seed, fuzzer)
+        harness.monitor()
+    else:
+        print('Failed to open or detect seed type.')
 
 if __name__ == '__main__':
     argc = len(sys.argv)
