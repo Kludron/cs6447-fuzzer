@@ -45,13 +45,16 @@ class CSV_Fuzz(Fuzz):
 class JSON_Fuzz(Fuzz):
     def __init__(self, input):
         super().__init__(input)
+        self.jsonObj = {}
     def checkType(self):
         try:
-            json.loads(self.input)
+            self.jsonObj = json.loads(self.input)
+            print(self.jsonObj)
             return True
         except ValueError:
             return False
     def mutate():
+        # do something
         pass
     def fuzz():
         pass
@@ -95,12 +98,13 @@ def checkType(filename):
     try:
         fp = open(filename, 'r')
         inputTxt = fp.read().strip()
-        if (CSV_Fuzz(inputTxt).checkType()):
-            return TYPE_CSV
-        elif (JSON_Fuzz(inputTxt).checkType()):
+        
+        if (JSON_Fuzz(inputTxt).checkType()):
             return TYPE_JSON
         elif (XML_Fuzz(inputTxt).checkType()):
             return TYPE_XML
+        elif (CSV_Fuzz(inputTxt).checkType()):
+            return TYPE_CSV
         else:
             return TYPE_PLAINTEXT
     except IOError:
