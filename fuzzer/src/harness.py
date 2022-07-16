@@ -2,14 +2,10 @@
 import datetime
 import os
 from queue import Empty, Full, Queue
-import random
-import string
 import subprocess
 import sys
 from threading import Semaphore, Thread
 import time
-
-from prettytable import PrettyTable
 
 from utils import Fuzz
 
@@ -42,6 +38,7 @@ class Harness():
         else: self.isStarted = True
         self.s_semaphore.release()
 
+        # Ensure given files are valid
         if not os.path.isfile(self.program):
             print('Binary not found')
             raise Exception(f'Binary file {self.program} not found')
@@ -50,23 +47,14 @@ class Harness():
             raise Exception(f'Seed file {self.seed} not found')
         else:
             # Create and start tester threads
-            for i in range(self.TESTERS):
+            for _ in range(self.TESTERS):
                 thread = Thread(target=self.test, daemon=True)
                 thread.start()
 
             # Create and start fuzzer threads
-            for i in range(self.FUZZERS):
+            for _ in range(self.FUZZERS):
                 thread = Thread(target=self.fuzz, daemon=True)
                 thread.start()
-
-    def __randomword(self, length) -> str:
-        """
-        Random string generator to act as a simple fuzzer engine
-        Can be removed when we have fuzzer engines for the different
-        file formats.
-        """
-        letters = string.ascii_lowercase
-        return ''.join(random.choice(letters) for i in range(length))
 
     def test(self):
         while True:
@@ -76,7 +64,6 @@ class Harness():
                 pass
             else:
                 try:
-                    # print("This is run", self.counter)
                     self.c_semaphore.acquire()
                     self.counter += 1
                     self.c_semaphore.release()
@@ -93,7 +80,7 @@ class Harness():
         """
         Fuzzer function generates mutations and places mutations on to the queue
         """
-        for i in range(self.MAX_TESTS):
+        for _ in range(self.MAX_TESTS):
             try:
                 # Replace this with fuzzer content generation
                 self.queue.put(self.fuzzer.fuzz())
@@ -104,7 +91,7 @@ class Harness():
         self.start()
 
         # Set defaults
-        curr_count = 0
+        curr_count = self.counter
         prev_count = 0
         start_time = time.time()
         curr_time = start_time
@@ -116,37 +103,36 @@ class Harness():
         # Start monitoring loop
         while True:
             if prev_time != 0:
-                # Create the table
-                table = PrettyTable([
-                    "Binary Name",
-                    "Run Time",
-                    "Total Tests",
-                    "Queue Length",
-                    "Current Rate",
-                    "Overall Rate"
-                ])
-                table.add_row([
-                    self.program,
-                    total_time,
-                    self.counter,
-                    self.queue.qsize(),
-                    curr_rate,
-                    total_rate
-                ])
 
-                # Update variables
-                curr_time = time.time()
-                # curr_count = self.counter
-                total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
-                curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
-                total_rate = round(curr_count/(curr_time - start_time))
+                # Create the table
+
+                table = {
+                    "Binary Name":self.program,
+                    "Run Time":total_time,
+                    "Total Tests":curr_count,
+                    "Queue Length":self.queue.qsize(),
+                    "Current Rate":curr_rate,
+                    "Overall Rate":total_rate,
+                }
+                
+                table_format = "{:<15}" * (len(table.keys()))
 
                 # Print output
                 if sys.platform == 'linux' or sys.platform == 'darwin':
                     os.system("clear")
                 elif sys.platform == 'win32':
                     os.system("cls")
-                print(table)
+
+                print(table_format.format("", *table.keys())) # Prints the headers
+                print(table_format.format("", *table.values())) # Prints the values
+
+                # Update variables
+                curr_time = time.time()
+                curr_count = self.counter
+                total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
+                curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
+                total_rate = round(curr_count/(curr_time - start_time))
+
             prev_time = curr_time
             prev_count = curr_count
             time.sleep(refresh_time)
