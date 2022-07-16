@@ -14,19 +14,14 @@ def print_type(file):
         print("Failed to open file/detect input type")
     elif val == TYPE_CSV:
         print("Detected CSV")
-        CSV_Fuzz.fuzz()
     elif val == TYPE_JSON:
         print("Detected JSON")
-        JSON_Fuzz.fuzz()
     elif val == TYPE_XML:
         print("Detected XML")
-        XML_Fuzz.fuzz()
     elif val == TYPE_PLAINTEXT:
         print("Detected Plaintext")
-        Plaintext_Fuzz.fuzz()
     elif val == TYPE_JPG:
         print("Detected JPG")
-        JPG_Fuzz.fuzz()
 
 def run(program, seed):
     print_type(seed)

@@ -20,8 +20,9 @@ class Fuzz():
         return False
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # The below is just a placeholder for testing purposes
+        return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
 
 # CSV Fuzzer
 class CSV_Fuzz(Fuzz):
@@ -37,8 +38,9 @@ class CSV_Fuzz(Fuzz):
         return True
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # Placeholder
+        return super().fuzz()
 
 # JSON Fuzzer
 class JSON_Fuzz(Fuzz):
@@ -52,8 +54,9 @@ class JSON_Fuzz(Fuzz):
             return False
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # Placeholder
+        return super().fuzz()
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -67,8 +70,9 @@ class XML_Fuzz(Fuzz):
             return False
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # Placeholder
+        return super().fuzz()
 
 # Plaintext Fuzzer. No need to overwrite checkType()
 class Plaintext_Fuzz(Fuzz):
@@ -76,8 +80,9 @@ class Plaintext_Fuzz(Fuzz):
         super().__init__(input)
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # Placeholder
+        return super().fuzz()
 
 # JPG Fuzzer. No need to overwrite checkType()
 class JPG_Fuzz(Fuzz):
@@ -86,8 +91,9 @@ class JPG_Fuzz(Fuzz):
     # I'm guessing we need to use bit flipping for this one
     def mutate():
         pass
-    def fuzz():
-        pass
+    def fuzz(self):
+        # Placeholder
+        return super().fuzz()
         
 
 def checkType(filename):

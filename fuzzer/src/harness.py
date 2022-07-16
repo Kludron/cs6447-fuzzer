@@ -71,7 +71,7 @@ class Harness():
     def test(self):
         while True:
             try:
-                fuzz = self.queue.get(timeout=0.2)
+                fuzzInput = self.queue.get(timeout=0.2)
             except Empty:
                 pass
             else:
@@ -80,7 +80,7 @@ class Harness():
                     self.c_semaphore.acquire()
                     self.counter += 1
                     self.c_semaphore.release()
-                    subprocess.run(self.program, input=fuzz, check=True, text=True, stdout=self.LOGFILE)
+                    subprocess.run(self.program, input=fuzzInput, check=True, text=True, stdout=self.LOGFILE)
                 except subprocess.CalledProcessError:
                     #######################################
                     # Update this to record input that crashes binary and exit fuzzer
@@ -93,24 +93,12 @@ class Harness():
         """
         Fuzzer function generates mutations and places mutations on to the queue
         """
-        # for i in range(self.max_tests):
-        #     try:
-        #         #Replace this with fuzzer content generation
-        #         string = self.__randomword(8)
-        #         self.queue.put(string)
-        #     except Full:
-        #         pass
-
-        # count = 1
-        # while count < self.MAX_TESTS:
-        #     try:
-        #         # Replace this with fuzzer content generation
-        #         string = self.__randomword(8)
-        #         self.queue.put(string)
-        #     except Full:
-        #         pass
-        #     else:
-        #         count += 1
+        for i in range(self.MAX_TESTS):
+            try:
+                # Replace this with fuzzer content generation
+                self.queue.put(self.fuzzer.fuzz())
+            except Full:
+                pass
 
     def monitor(self, refresh_time=2) -> None:
         self.start()
