@@ -2,7 +2,6 @@
 import sys
 import json
 import xml.etree.ElementTree as ElementTree
-from numpy import void
 from pwn import *
 
 TYPE_FAIL = -1
