@@ -2,8 +2,8 @@
 
 # COMP6447 Fuzzer
 
-from src.utils import *
-from src.harness import Harness
+from utils import *
+from harness import Harness
 
 TESTBINARY='tests/csv1'
 TESTSEED='tests/csv1.txt'
