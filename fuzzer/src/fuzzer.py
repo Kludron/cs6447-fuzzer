@@ -64,7 +64,7 @@ class JSON_Fuzz(Fuzz):
     def checkType(self):
         try:
             self.jsonObj = json.loads(self.input)
-            print(self.jsonObj)
+            # print(self.jsonObj)
             return True
         except ValueError:
             return False
@@ -131,14 +131,14 @@ class JSON_Fuzz(Fuzz):
     
     def insertRandomChar(self, s):
         idx = randint(0, len(s))
-        return s[:idx] + chr(randint(32, 127)) + s[idx:]
+        return s[:idx] + chr(randint(30, 127)) + s[idx:]    # insert random ascii character (excluding )
     
     def flipRandomBit(self, s):
         if s == '':
             return s
         idx = randint(0, len(s) - 1)
         c = s[idx]
-        mask = 1 << randint(0,6)
+        mask = 1 << randint(0,6)    # select random bit position to flip
         flipped = chr(ord(c) ^ mask)    # xor the random character and bitmask
         return s[:idx] + flipped + s[idx + 1:]
 
