@@ -117,7 +117,7 @@ class JSON_Fuzz(Fuzz):
         methods = [
             self.deleteRandomChar,
             self.insertRandomChar,
-            self.flipRandomChar,
+            self.flipRandomBit,
             self.multipleStringMutations
         ]
         method = choice(methods)
@@ -133,7 +133,7 @@ class JSON_Fuzz(Fuzz):
         idx = randint(0, len(s))
         return s[:idx] + chr(randint(32, 127)) + s[idx:]
     
-    def flipRandomChar(self, s):
+    def flipRandomBit(self, s):
         if s == '':
             return s
         idx = randint(0, len(s) - 1)
@@ -146,7 +146,7 @@ class JSON_Fuzz(Fuzz):
         methods = [
             self.deleteRandomChar,
             self.insertRandomChar,
-            self.flipRandomChar
+            self.flipRandomBit
         ]
         mutation = s
         iterations = randint(0, 20)
