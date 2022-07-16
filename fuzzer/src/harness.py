@@ -115,7 +115,7 @@ class Harness():
                     "Overall Rate":total_rate,
                 }
                 
-                table_format = "{:<15}" * (len(table.keys()))
+                table_format = "{:<15}" * (len(table.keys()) + 1)
 
                 # Print output
                 if sys.platform == 'linux' or sys.platform == 'darwin':
