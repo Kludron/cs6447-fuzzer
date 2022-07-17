@@ -319,18 +319,19 @@ def checkType(filename):
     try:
         fp = open(filename, 'r')
         inputTxt = fp.read().strip()
-        if (CSV_Fuzz(inputTxt).checkType()):
-            return TYPE_CSV
-        elif (JSON_Fuzz(inputTxt).checkType()):
-            return TYPE_JSON
+        
+        if (JSON_Fuzz(inputTxt).checkType()):
+            return TYPE_JSON, inputTxt
         elif (XML_Fuzz(inputTxt).checkType()):
-            return TYPE_XML
+            return TYPE_XML, inputTxt
+        elif (CSV_Fuzz(inputTxt).checkType()):
+            return TYPE_CSV, inputTxt
         else:
-            return TYPE_PLAINTEXT
+            return TYPE_PLAINTEXT, inputTxt
     except IOError:
-        return TYPE_FAIL
+        return TYPE_FAIL, ''
     except:
-        return TYPE_JPG
+        return TYPE_JPG, inputTxt
 
 def getType(filename) -> Fuzz or str:
     try:
