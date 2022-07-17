@@ -4,7 +4,7 @@ import json
 import xml.etree.ElementTree as ElementTree
 from pwn import *
 
-from fuzzer.src.csv_fuzzer import run_csv_fuzzer
+# from csv_fuzzer import run_csv_fuzzer
 
 TYPE_FAIL = -1
 TYPE_CSV = 0
@@ -15,7 +15,7 @@ TYPE_PLAINTEXT = 4
 
 # Generic Fuzzer Class
 class Fuzz():
-    def __init__(self, seed):
+    def __init__(self, seed: str):
         self.seed = seed
     def checkType(self):
         return False
@@ -63,14 +63,23 @@ class CSV_Fuzz(Fuzz):
             return line
         # Else, mutate field's data with ints.
         else:
-            line_len = len(line.split(",")) - 1
-            # i'th field is to be changed with value j.
-            i = random.randint(0, line_len)
-            j = random.randint(0, 999)
-            line[i] = j
-            # Change back the line and return.
-            line = str(line)
-            return ",".join(line) + "\n"
+            newRow = []
+            for element in line.split(','):
+                rand_i = random.randint(0, len(element)-1)
+                newstring = element[:rand_i] + random.choice(string.digits) + element[rand_i+1:]
+                newRow.append(newstring)
+            # line_len = len(line.split(",")) - 1
+            # # i'th field is to be changed with value j.
+            # i = random.randint(0, line_len)
+            # j = random.randint(0, 999)
+            # # Strings are immutable in python3 [TODO]
+            # newstring = line[:i] + str(j) + line[i+1:]
+            # # line[i] = j
+            # # Change back the line and return.
+            # line = str(line)
+            return ",".join(newRow) + "\n"
+
+            # a,b,5,d
 
     """
     Mutate the number of lines or the size of the line.
@@ -110,7 +119,7 @@ class CSV_Fuzz(Fuzz):
     """
     Run mutations on the input and return the new mutated input as a string.
     """
-    def __mutate_input(self, input): #[TODO]
+    def __mutate_input(self, input:list): #[TODO]
         new_mutated_input = []
 
         # Run mutations per every line.
@@ -126,32 +135,39 @@ class CSV_Fuzz(Fuzz):
             else:
                 new_mutated_input.append(self.__mutate_strings(line))
             
-            return ''.join(new_mutated_input)
+            try:
+                return ''.join(new_mutated_input)
+            except TypeError:
+                return ''
 
     """
     Function to run the csv fuzzer.
     """
     def mutate(self) -> list:
-        # Open the input file csv1.txt
-        with open(self.seed, 'rt', newline='') as file_ptr:
-            # Iteration counter.
-            i = 0
-            # New mutated input that reads from input_file.
-            # This is the input that will be mutated and sent to the binary.
-            new_mutated_input = file_ptr.read()
 
-            for i in range(999):
-                # After every 10 iterations reset the file pointer and the input.
-                if i % 10 == 0:
-                    # Set file ptr to the start.
-                    file_ptr.seek(0)
-                    new_mutated_input = file_ptr.read()
+        for i in range(999):
+            mutated_input = self.__mutate_input(self.seed.split('\n')[1:])
+            mutated_input = self.seed.split('\n')[0] + '\n' + mutated_input
+            self.fuzzList.append(mutated_input)
 
-                # Do the mutations.
-                new_mutated_input = self.__mutate_input(new_mutated_input.split("\n"))
+        # # Open the input file csv1.txt
+        # with open(self.seed, 'rt', newline='') as file_ptr:
+        #     # New mutated input that reads from input_file.
+        #     # This is the input that will be mutated and sent to the binary.
+        #     new_mutated_input = file_ptr.read()
+
+        #     for i in range(999):
+        #         # After every 10 iterations reset the file pointer and the input.
+        #         if i % 10 == 0:
+        #             # Set file ptr to the start.
+        #             file_ptr.seek(0)
+        #             new_mutated_input = file_ptr.read()
+
+        #         # Do the mutations.
+        #         new_mutated_input = self.__mutate_input(new_mutated_input.split("\n"))
                 
-                # Add mutations to list
-                self.fuzzList.append(new_mutated_input)
+        #         # Add mutations to list
+        #         self.fuzzList.append(new_mutated_input)
         return self.fuzzList
 
     def fuzz(self):
