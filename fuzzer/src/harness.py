@@ -1,4 +1,5 @@
 
+from asyncio.subprocess import PIPE
 import datetime
 import os
 from queue import Empty, Full, Queue
@@ -15,12 +16,13 @@ class Harness():
 
         self.program = program
         self.seed = seed
+        self.fuzzer = fuzzer
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
         self.TESTERS = 20
         self.FUZZERS = 1
-        self.LOGFILE = open('log.out', 'a')
+        self.LOGFILE = open('log.out', 'w')
 
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
         self.counter = 0
@@ -29,7 +31,8 @@ class Harness():
         self.isStarted = False
         self.s_semaphore = Semaphore()
 
-        self.fuzzer = fuzzer
+        self.out_semaphore = Semaphore()
+        self.outfile = open('bad.txt', 'w')
 
     def start(self) -> None:
         # Check if the harness has already been started
@@ -57,7 +60,7 @@ class Harness():
                 thread.start()
 
     def test(self):
-        while True:
+        while self.isStarted:
             try:
                 fuzzInput = self.queue.get(timeout=0.2)
             except Empty:
@@ -67,12 +70,12 @@ class Harness():
                     self.c_semaphore.acquire()
                     self.counter += 1
                     self.c_semaphore.release()
-                    subprocess.run(self.program, input=fuzzInput, check=True, text=True, stdout=self.LOGFILE)
-                except subprocess.CalledProcessError:
-                    #######################################
-                    # Update this to record input that crashes binary and exit fuzzer
-                    #######################################
-                    pass
+                    subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                    self.LOGFILE.write(fuzzInput+'\n...\n')
+                except subprocess.CalledProcessError as e:
+                    self.out_semaphore.acquire()
+                    self.outfile.write(fuzzInput + '\n')
+                    self.out_semaphore.release()
                 else:
                     pass
 
@@ -101,38 +104,61 @@ class Harness():
         total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
 
         # Start monitoring loop
-        while True:
-            if prev_time != 0:
+        try:
+            while True:
+                if prev_time != 0:
 
-                # Create the table
+                    # Create the table
 
-                table = {
-                    "Binary Name":self.program,
-                    "Run Time":total_time,
-                    "Total Tests":curr_count,
-                    "Queue Length":self.queue.qsize(),
-                    "Current Rate":curr_rate,
-                    "Overall Rate":total_rate,
-                }
-                
-                table_format = "{:<15}" * (len(table.keys()) + 1)
+                    table = {
+                        "Binary Name":self.program,
+                        "Run Time":total_time,
+                        "Total Tests":curr_count,
+                        "Queue Length":self.queue.qsize(),
+                        "Current Rate":curr_rate,
+                        "Overall Rate":total_rate,
+                    }
+                    
+                    table_format = "{:<15}" * (len(table.keys()) + 1)
 
-                # Print output
-                if sys.platform == 'linux' or sys.platform == 'darwin':
-                    os.system("clear")
-                elif sys.platform == 'win32':
-                    os.system("cls")
+                    # Print output
+                    if sys.platform == 'linux' or sys.platform == 'darwin':
+                        os.system("clear")
+                    elif sys.platform == 'win32':
+                        os.system("cls")
 
-                print(table_format.format("", *table.keys())) # Prints the headers
-                print(table_format.format("", *table.values())) # Prints the values
+                    print(table_format.format("", *table.keys())) # Prints the headers
+                    print(table_format.format("", *table.values())) # Prints the values
+                    print("Press Ctrl + C to exit.")
 
-                # Update variables
-                curr_time = time.time()
-                curr_count = self.counter
-                total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
-                curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
-                total_rate = round(curr_count/(curr_time - start_time))
+                    # Update variables
+                    curr_time = time.time()
+                    curr_count = self.counter
+                    total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
+                    curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
+                    total_rate = round(curr_count/(curr_time - start_time))
 
-            prev_time = curr_time
-            prev_count = curr_count
-            time.sleep(refresh_time)
+                prev_time = curr_time
+                prev_count = curr_count
+                time.sleep(refresh_time)
+        except KeyboardInterrupt: # Ctrl + C
+            print('Closing threads...')
+            self.s_semaphore.acquire()
+            self.isStarted = False
+            self.s_semaphore.release()
+            time.sleep(3)
+            self.LOGFILE.close()
+            self.outfile.close()
+            print('Output saved to bad.txt')
+            return
+
+if __name__ == '__main__':
+    try:
+        inputs = [
+            'header,must,stay,intact',
+            '0,1,1,0'
+        ]
+        s = subprocess.run('tests/csv1', input='\n'.join(inputs), check=True, text=True)
+        print(s.returncode)
+    except subprocess.CalledProcessError as e:
+        print(e.args, e.returncode)

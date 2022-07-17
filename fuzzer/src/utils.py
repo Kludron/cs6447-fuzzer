@@ -3,6 +3,8 @@ import sys
 import json
 import xml.etree.ElementTree as ElementTree
 from pwn import *
+import copy
+from random import choice
 
 # from csv_fuzzer import run_csv_fuzzer
 
@@ -145,29 +147,10 @@ class CSV_Fuzz(Fuzz):
     """
     def mutate(self) -> list:
 
-        for i in range(999):
+        for _ in range(999):
             mutated_input = self.__mutate_input(self.seed.split('\n')[1:])
             mutated_input = self.seed.split('\n')[0] + '\n' + mutated_input
             self.fuzzList.append(mutated_input)
-
-        # # Open the input file csv1.txt
-        # with open(self.seed, 'rt', newline='') as file_ptr:
-        #     # New mutated input that reads from input_file.
-        #     # This is the input that will be mutated and sent to the binary.
-        #     new_mutated_input = file_ptr.read()
-
-        #     for i in range(999):
-        #         # After every 10 iterations reset the file pointer and the input.
-        #         if i % 10 == 0:
-        #             # Set file ptr to the start.
-        #             file_ptr.seek(0)
-        #             new_mutated_input = file_ptr.read()
-
-        #         # Do the mutations.
-        #         new_mutated_input = self.__mutate_input(new_mutated_input.split("\n"))
-                
-        #         # Add mutations to list
-        #         self.fuzzList.append(new_mutated_input)
         return self.fuzzList
 
     def fuzz(self):
@@ -192,8 +175,8 @@ class JSON_Fuzz(Fuzz):
             'big_pos': 1111111111111111111111111111111111111111111
         }
         try:
-            self.jsonObj = json.loads(self.input)
-        except:
+            self.jsonObj : dict = json.loads(self.input)
+        except Exception:
             self.jsonObj = {}
             
     def checkType(self):
@@ -291,7 +274,7 @@ class JSON_Fuzz(Fuzz):
         return mutation
     
     def fuzz(self):
-        return self.mutate()
+        return json.dumps(self.mutate())
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -333,17 +316,17 @@ class JPG_Fuzz(Fuzz):
 
 def checkType(filename):
     try:
-        fp = open(filename, 'r')
-        inputTxt = fp.read().strip()
-        
-        if (JSON_Fuzz(inputTxt).checkType()):
-            return TYPE_JSON, inputTxt
-        elif (XML_Fuzz(inputTxt).checkType()):
-            return TYPE_XML, inputTxt
-        elif (CSV_Fuzz(inputTxt).checkType()):
-            return TYPE_CSV, inputTxt
-        else:
-            return TYPE_PLAINTEXT, inputTxt
+        with open(filename, 'r') as fp:
+            inputTxt = fp.read().strip()
+            
+            if (JSON_Fuzz(inputTxt).checkType()):
+                return TYPE_JSON, inputTxt
+            elif (XML_Fuzz(inputTxt).checkType()):
+                return TYPE_XML, inputTxt
+            elif (CSV_Fuzz(inputTxt).checkType()):
+                return TYPE_CSV, inputTxt
+            else:
+                return TYPE_PLAINTEXT, inputTxt
     except IOError:
         return TYPE_FAIL, ''
     except:
@@ -351,16 +334,16 @@ def checkType(filename):
 
 def getType(filename) -> Fuzz or str:
     try:
-        fp = open(filename, 'r')
-        inputTxt = fp.read().strip()
-        if (CSV_Fuzz(inputTxt).checkType()):
-            return CSV_Fuzz(inputTxt)
-        elif (JSON_Fuzz(inputTxt).checkType()):
-            return JSON_Fuzz(inputTxt)
-        elif (XML_Fuzz(inputTxt).checkType()):
-            return XML_Fuzz(inputTxt)
-        else:
-            return Plaintext_Fuzz(inputTxt)
+        with open(filename, 'r') as fp:
+            inputTxt = fp.read().strip()
+            if (CSV_Fuzz(inputTxt).checkType()):
+                return CSV_Fuzz(inputTxt)
+            elif (JSON_Fuzz(inputTxt).checkType()):
+                return JSON_Fuzz(inputTxt)
+            elif (XML_Fuzz(inputTxt).checkType()):
+                return XML_Fuzz(inputTxt)
+            else:
+                return Plaintext_Fuzz(inputTxt)
     except IOError:
         return TYPE_FAIL
     except:
