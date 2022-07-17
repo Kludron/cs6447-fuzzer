@@ -6,7 +6,7 @@ Function to run the csv fuzzer.
 'binary' is the input csv binary.
 'input_file' is csv1.txt
 """
-def run_csv_fuzzer(binary, input_file):
+def run_csv_fuzzer(binary, input_file) -> list:
     # Open the input file csv1.txt
     with open(input_file, 'rt', newline='') as file_ptr:
         # Iteration counter.
