@@ -5,7 +5,7 @@
 from utils import *
 from harness import Harness
 
-TESTBINARY='tests/csv1' 
+TESTBINARY='tests/csv1'
 TESTSEED='tests/csv1.txt'
 
 def print_type(file):
