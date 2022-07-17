@@ -130,8 +130,6 @@ class CSV_Fuzz(Fuzz):
 
     """
     Function to run the csv fuzzer.
-    'binary' is the input csv binary.
-    'input_file' is csv1.txt
     """
     def mutate(self) -> list:
         # Open the input file csv1.txt
@@ -142,41 +140,142 @@ class CSV_Fuzz(Fuzz):
             # This is the input that will be mutated and sent to the binary.
             new_mutated_input = file_ptr.read()
 
-            while i < 999:
+            for i in range(999):
                 # After every 10 iterations reset the file pointer and the input.
                 if i % 10 == 0:
                     # Set file ptr to the start.
                     file_ptr.seek(0)
                     new_mutated_input = file_ptr.read()
-                
+
                 # Do the mutations.
                 new_mutated_input = self.__mutate_input(new_mutated_input.split("\n"))
                 
-                # Send the mutations.
-                # TODO: Send the input to the binary.
+                # Add mutations to list
                 self.fuzzList.append(new_mutated_input)
-                i += 1
+        return self.fuzzList
 
     def fuzz(self):
         try:
             return self.fuzzList.pop(0)
-        return run_csv_fuzzer(self.seed)
+        except IndexError:
+            # Regenerate a fuzzer input list
+            self.mutate()
+            return self.fuzz() # This could infinite loop [TODO]
 
 # JSON Fuzzer
 class JSON_Fuzz(Fuzz):
-    def __init__(self, seed):
-        super().__init__(seed)
+    def __init__(self, input):
+        super().__init__(input)
+        self.basic_checks = {
+            'buffer_overflow': 'A'*999,
+            'format': '%p',
+            'pos': 1,
+            'neg': -1,
+            'zero': 0,
+            'big_neg': -1111111111111111111111111111111111111111111,
+            'big_pos': 1111111111111111111111111111111111111111111
+        }
+        try:
+            self.jsonObj = json.loads(self.input)
+        except:
+            self.jsonObj = {}
+            
     def checkType(self):
         try:
-            json.loads(self.seed)
+            json.loads(self.input)
             return True
         except ValueError:
             return False
-    def mutate():
-        pass
+
+    '''
+        Perform mutations on input.
+        First goes through the basic checks to get basic errors
+        Then performs random mutations
+    '''
+    def mutate(self):
+        mutation = ''
+        if (self.basic_checks):
+            # test for any basic errors
+            mutation = self.basicMutate()
+        else:
+            # otherwise perform random mutation
+            mutation = self.dumbMutate()
+        return mutation
+        
+    '''
+        As the name implies, performs dumb, random mutations. 
+    '''
+    def dumbMutate(self):
+        mutation = copy.deepcopy(self.jsonObj)
+        for key in self.jsonObj:
+            if isinstance(self.jsonObj[key], int):
+                mutation[key] = randint(-2147483647, 2147483647) # we've already checked for int overflows/underflows in basicMutate()
+            elif isinstance(self.jsonObj[key], str):
+                mutation[key] = self.mutateString(self.jsonObj[key])
+            elif isinstance(self.jsonObj[key], list):
+                for index, element in enumerate(self.jsonObj[key]):
+                    if isinstance(element, int):
+                        mutation[key][index] = randint(-2147483647, 2147483647)
+                    elif isinstance(element, str):
+                        mutation[key][index] = self.mutateString(element)
+        return mutation
+
+    '''
+        Fill the mutation with a basic check value and then remove that check
+        to quickly identify simple vulnerabilities
+    '''
+    def basicMutate(self):
+        mutation = copy.deepcopy(self.jsonObj)
+        first_pair = next(iter((self.basic_checks.items())))
+        for key in self.jsonObj:
+            mutation[key] = first_pair[1]
+        self.basic_checks.pop(first_pair[0])
+        return mutation
+    
+    def mutateString(self, s):
+        methods = [
+            self.deleteRandomChar,
+            self.insertRandomChar,
+            self.flipRandomBit,
+            self.multipleStringMutations
+        ]
+        method = choice(methods)
+        return method(s)
+    
+    def deleteRandomChar(self, s):
+        if s == '':
+            return s
+        idx = randint(0, len(s) - 1)
+        return s[:idx] + s[idx + 1:]
+
+    def insertRandomChar(self, s):
+        idx = randint(0, len(s))
+        return s[:idx] + chr(randint(30, 127)) + s[idx:]    # insert random ascii character (excluding )
+    
+    def flipRandomBit(self, s):
+        if s == '':
+            return s
+        idx = randint(0, len(s) - 1)
+        c = s[idx]
+        mask = 1 << randint(0,6)    # select random bit position to flip
+        flipped = chr(ord(c) ^ mask)    # xor the random character and bitmask
+        return s[:idx] + flipped + s[idx + 1:]
+
+    def multipleStringMutations(self, s):
+        methods = [
+            self.deleteRandomChar,
+            self.insertRandomChar,
+            self.flipRandomBit
+        ]
+        mutation = s
+        iterations = randint(0, 20)
+        for i in range(iterations):
+            method = choice(methods)
+            mutation = method(mutation)
+        return mutation
+    
     def fuzz(self):
-        # Placeholder
-        return super().fuzz()
+        return self.mutate()
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -272,3 +371,4 @@ if __name__ == '__main__':
     elif type == TYPE_JPG:
         print("Detected JPG")
         JPG_Fuzz.fuzz()
+
