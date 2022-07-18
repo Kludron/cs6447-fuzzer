@@ -331,31 +331,33 @@ def checkType(filename):
     except IOError:
         return TYPE_FAIL, ''
     except:
-        return TYPE_JPG, inputTxt
+        return TYPE_JPG, ''
 
 '''
     Returns fuzzer on success or <None>
 '''
 def getType(filename) -> Fuzz or None:    
+    print("getType() - seed: ", filename)
+    
     fuzzer = Fuzz
-    type, inputTxt = checkType(sys.argv[1])
+    type, inputTxt = checkType(filename)
     
     if type == TYPE_FAIL:
         return None
     elif type == TYPE_CSV:
-        print("Detected CSV")
+        print("getType() - Detected CSV")
         fuzzer = CSV_Fuzz()
     elif type == TYPE_JSON:
-        print("Detected JSON")
+        print("getType() - Detected JSON")
         fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
-        print("Detected XML")
+        print("getType() - Detected XML")
         XML_Fuzz.fuzz()
     elif type == TYPE_PLAINTEXT:
-        print("Detected Plaintext")
+        print("getType() - Detected Plaintext")
         Plaintext_Fuzz.fuzz()
     elif type == TYPE_JPG:
-        print("Detected JPG")
+        print("getType() - Detected JPG")
         JPG_Fuzz.fuzz()
     return fuzzer
     
