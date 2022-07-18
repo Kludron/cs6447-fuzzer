@@ -101,7 +101,9 @@ class Harness():
         for _ in range(self.MAX_TESTS):
             if t.alive == True:
                 try:
-                    self.queue.put(self.fuzzer.fuzz())
+                    input = self.fuzzer.fuzz()
+                    if input != None:
+                        self.queue.put(self.fuzzer.fuzz())
                 except Full:
                     pass
             else:
@@ -125,7 +127,7 @@ class Harness():
         # Start monitoring loop
         try:
             start = time.time()
-            while time.time() < start + 10:
+            while time.time() < start + 180:
                 if prev_time != 0:
 
                     # Create the table
