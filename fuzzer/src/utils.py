@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ElementTree
 from pwn import *
 import copy
 from random import choice
+# from tmp_csvFuzz import CSV_Fuzz
 
 # from csv_fuzzer import run_csv_fuzzer
 
@@ -27,11 +28,57 @@ class Fuzz():
         # The below is just a placeholder for testing purposes
         return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
 
-# CSV Fuzzer
 class CSV_Fuzz(Fuzz):
-    def __init__(self, seed):
+    
+    def __init__(self, seed: str) -> None:
         super().__init__(seed)
-        self.fuzzList = list()
+        self.mutations = list()
+        self.DELIMITER = ','
+        self.maxsize = 10000 # Just some obscure value that is large enough to likely cause a segfault. Much larger and the program is killed because it takes up too much memory.
+        self.structure = seed.split('\n')[0]
+        self.sItems = len(self.structure.split(self.DELIMITER))
+        self.__generate()
+
+    def __generate_random(self):
+        # Generate strings with random characters
+        printable = list(string.printable)
+        printable.remove('\n')
+        chars = [printable for _ in range(self.sItems)]
+        while chars[0]:
+            randString = []
+            for i in range(1, self.sItems):
+                randString.append(chars[i].pop(random.randint(0, len(chars[i])-1)))
+            yield self.DELIMITER.join(randString)
+
+    def __generate_long(self):
+        for i in range(self.maxsize):
+            randString = []
+            for _ in range(self.sItems):
+                randString.append(random.choice(string.ascii_letters)*random.randint(0,i))
+            yield self.DELIMITER.join(randString)
+
+    def __generate_lots(self):
+        for _ in range(self.maxsize):
+            yield self.DELIMITER.join(list(random.choice(string.ascii_letters)*random.randint(self.sItems,self.maxsize)))
+
+    def __generate_lines(self):
+        for i in range(self.maxsize):
+            # Create a line with self.sItems items, joined by i \n's
+            randLine = []
+            for _ in range(self.sItems):
+                randLine.append(random.choice(string.ascii_letters))
+            randString = self.DELIMITER.join(randLine)
+            yield '\n'.join([randString for _ in range(i)])
+
+    def __generate(self):
+        for i in self.__generate_long():
+            self.mutations.append(i)
+        for i in self.__generate_random():
+            self.mutations.append(i)
+        for i in self.__generate_lots():
+            self.mutations.append(i)
+        for i in self.__generate_lines():
+            self.mutations.append(i)
 
     def checkType(self):
         self.lines = self.seed.split("\n")
@@ -42,129 +89,154 @@ class CSV_Fuzz(Fuzz):
                 return False
         return True
 
-    """
-    Mutate the field data, if the line is not empty, with string of characters.
-    """
-    def __mutate_strings(self, line): # [TODO]
-        # If line is empty, return empty line back.
-        if not line:
-            return line
-        # Else, add string of chars at the end to the line.
-        # Random letter between A to Z.
-        random_letter = random.choice(string.ascii_uppercase)
-        i = random.randint(0, 100)
-        # Add the random letter 'i' times at the end of the line, separated by commas.
-        return line + (i * (random_letter + ","))
-
-    """
-    Mutate the field data, if the line is not empty, with integer.
-    """
-    def __mutate_ints(self, line): #[TODO]
-        # If line is empty, return empty line back.
-        if not line:
-            return line
-        # Else, mutate field's data with ints.
-        else:
-            newRow = []
-            for element in line.split(','):
-                rand_i = random.randint(0, len(element)-1)
-                newstring = element[:rand_i] + random.choice(string.digits) + element[rand_i+1:]
-                newRow.append(newstring)
-            # line_len = len(line.split(",")) - 1
-            # # i'th field is to be changed with value j.
-            # i = random.randint(0, line_len)
-            # j = random.randint(0, 999)
-            # # Strings are immutable in python3 [TODO]
-            # newstring = line[:i] + str(j) + line[i+1:]
-            # # line[i] = j
-            # # Change back the line and return.
-            # line = str(line)
-            return ",".join(newRow) + "\n"
-
-            # a,b,5,d
-
-    """
-    Mutate the number of lines or the size of the line.
-    """
-    def __mutate_line(self, line) -> str: #[TODO]
-        # Random number between 0 and 100.
-        i = random.randint(0, 100)
-        
-        # 20% chance: delete the line.
-        if i < 20:
-            return ''
-        # 20% chance: do nothing.
-        elif i < 40:
-            return line
-        # 20% chance: add a new line to the current line with all empty fields.
-        elif i < 60:
-            line_len = len(line.split(",")) - 1
-            line = line + "\n" + ("," * line_len)
-        # 20% chance: duplicate the line 'i' times.
-        elif i < 80:
-            # If line is empty, return empty line.
-            if line.rstrip() == '':
-                return line
-            # Else, duplicate the line.
-            else:
-                return (i * (line + "\n"))
-        # 20% chance: increase line length by 'i' times.
-        # i here is between 80 and 100.
-        else:
-            new_line = []
-            line = line.split(",")
-            for l in line:
-                l = i * l.rstrip()
-                new_line.append(l)
-            return ",".join(new_line)
-
-    """
-    Run mutations on the input and return the new mutated input as a string.
-    """
-    def __mutate_input(self, input:list): #[TODO]
-        new_mutated_input = []
-
-        # Run mutations per every line.
-        for line in input:
-            i = random.randint(0, 100)
-            # 50% chance that number or size of the line is mutated.
-            if i < 50:
-                new_mutated_input.append(self.__mutate_line(line))
-            # 25% chance that fields are mutated with ints.
-            elif i > 50 and i <= 75:
-                new_mutated_input.append(self.__mutate_ints(line))
-            # 25% chance that fields are mutated with strings or chars.
-            else:
-                new_mutated_input.append(self.__mutate_strings(line))
-            
-            try:
-                return ''.join(new_mutated_input)
-            except TypeError:
-                return ''
-
-    """
-    Function to run the csv fuzzer.
-    """
-    def mutate(self) -> list:
-
-        for _ in range(999):
-            mutated_input = self.__mutate_input(self.seed.split('\n')[1:])
-            mutated_input = self.seed.split('\n')[0] + '\n' + mutated_input
-            self.fuzzList.append(mutated_input)
-        return self.fuzzList
+    def mutate(self):
+        self.__generate()
 
     def fuzz(self):
         try:
-            return self.fuzzList.pop(0)
+            return self.structure + '\n' + self.mutations.pop(0)
         except IndexError:
-            # Regenerate a fuzzer input list
-            self.mutate()
-            return self.fuzz() # This could infinite loop [TODO]
+            self.__generate()
+            return self.fuzz()
+
+# # CSV Fuzzer
+# class CSV_Fuzz(Fuzz):
+#     def __init__(self, seed):
+#         super().__init__(seed)
+#         self.fuzzList = list()
+
+#     def checkType(self):
+#         self.lines = self.seed.split("\n")
+#         first_row_commas = self.lines[0].count(",")
+        
+#         for line in self.lines:
+#             if line.count(",") != first_row_commas or first_row_commas == 0:
+#                 return False
+#         return True
+
+#     """
+#     Mutate the field data, if the line is not empty, with string of characters.
+#     """
+#     def __mutate_strings(self, line): # [TODO]
+#         # If line is empty, return empty line back.
+#         if not line:
+#             return line
+#         # Else, add string of chars at the end to the line.
+#         # Random letter between A to Z.
+#         random_letter = random.choice(string.ascii_uppercase)
+#         i = random.randint(0, 100)
+#         # Add the random letter 'i' times at the end of the line, separated by commas.
+#         return line + (i * (random_letter + ","))
+
+#     """
+#     Mutate the field data, if the line is not empty, with integer.
+#     """
+#     def __mutate_ints(self, line): #[TODO]
+#         # If line is empty, return empty line back.
+#         if not line:
+#             return line
+#         # Else, mutate field's data with ints.
+#         else:
+#             newRow = []
+#             for element in line.split(','):
+#                 rand_i = random.randint(0, len(element)-1)
+#                 newstring = element[:rand_i] + random.choice(string.digits) + element[rand_i+1:]
+#                 newRow.append(newstring)
+#             # line_len = len(line.split(",")) - 1
+#             # # i'th field is to be changed with value j.
+#             # i = random.randint(0, line_len)
+#             # j = random.randint(0, 999)
+#             # # Strings are immutable in python3 [TODO]
+#             # newstring = line[:i] + str(j) + line[i+1:]
+#             # # line[i] = j
+#             # # Change back the line and return.
+#             # line = str(line)
+#             return ",".join(newRow) + "\n"
+
+#             # a,b,5,d
+
+#     """
+#     Mutate the number of lines or the size of the line.
+#     """
+#     def __mutate_line(self, line) -> str: #[TODO]
+#         # Random number between 0 and 100.
+#         i = random.randint(0, 100)
+        
+#         # 20% chance: delete the line.
+#         if i < 20:
+#             return ''
+#         # 20% chance: do nothing.
+#         elif i < 40:
+#             return line
+#         # 20% chance: add a new line to the current line with all empty fields.
+#         elif i < 60:
+#             line_len = len(line.split(",")) - 1
+#             line = line + "\n" + ("," * line_len)
+#         # 20% chance: duplicate the line 'i' times.
+#         elif i < 80:
+#             # If line is empty, return empty line.
+#             if line.rstrip() == '':
+#                 return line
+#             # Else, duplicate the line.
+#             else:
+#                 return (i * (line + "\n"))
+#         # 20% chance: increase line length by 'i' times.
+#         # i here is between 80 and 100.
+#         else:
+#             new_line = []
+#             line = line.split(",")
+#             for l in line:
+#                 l = i * l.rstrip()
+#                 new_line.append(l)
+#             return ",".join(new_line)
+
+#     """
+#     Run mutations on the input and return the new mutated input as a string.
+#     """
+#     def __mutate_input(self, input:list): #[TODO]
+#         new_mutated_input = []
+
+#         # Run mutations per every line.
+#         for line in input:
+#             i = random.randint(0, 100)
+#             # 50% chance that number or size of the line is mutated.
+#             if i < 50:
+#                 new_mutated_input.append(self.__mutate_line(line))
+#             # 25% chance that fields are mutated with ints.
+#             elif i > 50 and i <= 75:
+#                 new_mutated_input.append(self.__mutate_ints(line))
+#             # 25% chance that fields are mutated with strings or chars.
+#             else:
+#                 new_mutated_input.append(self.__mutate_strings(line))
+            
+#             try:
+#                 return ''.join(new_mutated_input)
+#             except TypeError:
+#                 return ''
+
+#     """
+#     Function to run the csv fuzzer.
+#     """
+#     def mutate(self) -> list:
+
+#         for _ in range(999):
+#             mutated_input = self.__mutate_input(self.seed.split('\n')[1:])
+#             mutated_input = self.seed.split('\n')[0] + '\n' + mutated_input
+#             self.fuzzList.append(mutated_input)
+#         return self.fuzzList
+
+#     def fuzz(self):
+#         try:
+#             return self.fuzzList.pop(0)
+#         except IndexError:
+#             # Regenerate a fuzzer input list
+#             self.mutate()
+#             return self.fuzz() # This could infinite loop [TODO]
 
 # JSON Fuzzer
 class JSON_Fuzz(Fuzz):
-    def __init__(self, input):
-        super().__init__(input)
+    def __init__(self, seed):
+        super().__init__(seed)
         self.basic_checks = {
             'buffer_overflow': 'A'*999,
             'format': '%p',
@@ -175,7 +247,7 @@ class JSON_Fuzz(Fuzz):
             'big_pos': 1111111111111111111111111111111111111111111
         }
         try:
-            self.jsonObj = json.loads(self.seed)
+            self.jsonObj : dict = json.loads(self.seed)
         except Exception:
             self.jsonObj = {}
             
@@ -274,10 +346,7 @@ class JSON_Fuzz(Fuzz):
         return mutation
     
     def fuzz(self):
-        try:
-            return json.dumps(self.mutate())
-        except:
-            return None
+        return json.dumps(self.mutate())
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -315,11 +384,13 @@ class JPG_Fuzz(Fuzz):
     def fuzz(self):
         # Placeholder
         return super().fuzz()
+        
 
 def checkType(filename):
     try:
         with open(filename, 'r') as fp:
             inputTxt = fp.read().strip()
+            
             if (JSON_Fuzz(inputTxt).checkType()):
                 return TYPE_JSON, inputTxt
             elif (XML_Fuzz(inputTxt).checkType()):
@@ -331,90 +402,45 @@ def checkType(filename):
     except IOError:
         return TYPE_FAIL, ''
     except:
-        return TYPE_JPG, ''
+        return TYPE_JPG, inputTxt
 
-'''
-    Returns fuzzer on success or <None>
-'''
-def getType(filename) -> Fuzz or None:    
-    print("getType() - seed: ", filename)
-    
-    fuzzer = Fuzz
-    type, inputTxt = checkType(filename)
-    print(inputTxt)
-    
-    if type == TYPE_FAIL:
-        return None
-    elif type == TYPE_CSV:
-        print("getType() - Detected CSV")
-        fuzzer = CSV_Fuzz()
-    elif type == TYPE_JSON:
-        print("getType() - Detected JSON")
-        fuzzer = JSON_Fuzz(inputTxt)
-    elif type == TYPE_XML:
-        print("getType() - Detected XML")
-        XML_Fuzz.fuzz()
-    elif type == TYPE_PLAINTEXT:
-        print("getType() - Detected Plaintext")
-        Plaintext_Fuzz.fuzz()
-    elif type == TYPE_JPG:
-        print("getType() - Detected JPG")
-        JPG_Fuzz.fuzz()
-    return fuzzer
-    
-    '''
-        try:
-            with open(filename, 'r') as fp:
-                inputTxt = fp.read().strip()
-                
-                if (CSV_Fuzz(inputTxt).checkType()[0]):
-                    return CSV_Fuzz(inputTxt)
-                elif (JSON_Fuzz(inputTxt).checkType()[0]):
-                    return JSON_Fuzz(inputTxt)
-                elif (XML_Fuzz(inputTxt).checkType()[0]):
-                    return XML_Fuzz(inputTxt)
-                else:
-                    return Plaintext_Fuzz(inputTxt)
-        except IOError:
-            return TYPE_FAIL
-        except:
-            return JPG_Fuzz(inputTxt)
-    '''
+def getType(filename) -> Fuzz or str:
+    try:
+        with open(filename, 'r') as fp:
+            inputTxt = fp.read().strip()
+            if (CSV_Fuzz(inputTxt).checkType()):
+                return CSV_Fuzz(inputTxt)
+            elif (JSON_Fuzz(inputTxt).checkType()):
+                return JSON_Fuzz(inputTxt)
+            elif (XML_Fuzz(inputTxt).checkType()):
+                return XML_Fuzz(inputTxt)
+            else:
+                return Plaintext_Fuzz(inputTxt)
+    except IOError:
+        return TYPE_FAIL
+    except:
+        return JPG_Fuzz(inputTxt)
 
 if __name__ == '__main__':
     print("Sample input: ", sys.argv[1])
     
-    fuzzer = getType(sys.argv[1])
-    
-    print(fuzzer)
-    for i in range(20):
-        print(fuzzer.fuzz())
-    
-    
-    
-    # print("type", checkType(sys.argv[1])[0])
-    
-
-    # type, extracted_seed  = checkType(sys.argv[1])
-    # print("identified type",type)
-    # print("inputstr: ", extracted_seed)
+    type = checkType(sys.argv[1])
             
-    # if type == TYPE_FAIL:
-    #     print("Failed to open file/detect input type")
-    # elif type == TYPE_CSV:
-    #     print("Detected CSV")
-    #     CSV_Fuzz.fuzz()
-    # elif type == TYPE_JSON:
-    #     print("Detected JSON")
-    #     for i in range(100):
-    #         print(JSON_Fuzz.fuzz())
-    # elif type == TYPE_XML:
-    #     print("Detected XML")
-    #     XML_Fuzz.fuzz()
-    # elif type == TYPE_PLAINTEXT:
-    #     print("Detected Plaintext")
-    #     Plaintext_Fuzz.fuzz()
-    # elif type == TYPE_JPG:
-    #     print("Detected JPG")
-    #     JPG_Fuzz.fuzz()
+    if type == TYPE_FAIL:
+        print("Failed to open file/detect input type")
+    elif type == TYPE_CSV:
+        print("Detected CSV")
+        CSV_Fuzz.fuzz()
+    elif type == TYPE_JSON:
+        print("Detected JSON")
+        JSON_Fuzz.fuzz()
+    elif type == TYPE_XML:
+        print("Detected XML")
+        XML_Fuzz.fuzz()
+    elif type == TYPE_PLAINTEXT:
+        print("Detected Plaintext")
+        Plaintext_Fuzz.fuzz()
+    elif type == TYPE_JPG:
+        print("Detected JPG")
+        JPG_Fuzz.fuzz()
 
