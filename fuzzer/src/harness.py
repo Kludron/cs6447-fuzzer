@@ -81,7 +81,6 @@ class Harness():
                     subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
-                    #TODO potentially remove this if if we deciced to run loop for 3 minutes only
                     if e.returncode != -2:
                         self.out_semaphore.acquire()
                         self.outfile.write(fuzzInput + '\n')
@@ -127,7 +126,7 @@ class Harness():
         # Start monitoring loop
         try:
             start = time.time()
-            while time.time() < start + 180:
+            while time.time() < start + 190:
                 if prev_time != 0:
 
                     # Create the table
