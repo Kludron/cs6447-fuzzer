@@ -5,8 +5,10 @@ import os
 from queue import Empty, Full, Queue
 import subprocess
 import sys
-from threading import Semaphore, Thread
+from threading import Semaphore, Thread, active_count, enumerate, current_thread
 import time
+import re
+import signal
 
 from utils import Fuzz
 
@@ -35,6 +37,7 @@ class Harness():
         self.outfile = open('bad.txt', 'w')
 
     def start(self) -> None:
+
         # Check if the harness has already been started
         self.s_semaphore.acquire()
         if self.isStarted: return
@@ -51,7 +54,7 @@ class Harness():
         else:
             # Create and start tester threads
             for _ in range(self.TESTERS):
-                thread = Thread(target=self.test, daemon=True)
+                thread = Thread(target=self.test, daemon=True)        
                 thread.start()
 
             # Create and start fuzzer threads
@@ -59,8 +62,13 @@ class Harness():
                 thread = Thread(target=self.fuzz, daemon=True)
                 thread.start()
 
+
+
+
     def test(self):
-        while self.isStarted:
+        t = current_thread()
+        t.alive = True
+        while t.alive == True:
             try:
                 fuzzInput = self.queue.get(timeout=0.2)
             except Empty:
@@ -73,22 +81,33 @@ class Harness():
                     subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
-                    self.out_semaphore.acquire()
-                    self.outfile.write(fuzzInput + '\n')
-                    self.out_semaphore.release()
+                    #TODO potentially remove this if if we deciced to run loop for 3 minutes only
+                    if e.returncode != -2:
+                        self.out_semaphore.acquire()
+                        self.outfile.write(fuzzInput + '\n')
+                        self.out_semaphore.release()
                 else:
                     pass
+
+        
+
 
     def fuzz(self) -> None:
         """
         Fuzzer function generates mutations and places mutations on to the queue
         """
+        t = current_thread()
+        t.alive = True
         for _ in range(self.MAX_TESTS):
-            try:
-                # Replace this with fuzzer content generation
-                self.queue.put(self.fuzzer.fuzz())
-            except Full:
-                pass
+            if t.alive == True:
+                try:
+                    self.queue.put(self.fuzzer.fuzz())
+                except Full:
+                    pass
+            else:
+                sys.exit(0)
+
+
 
     def monitor(self, refresh_time=2) -> None:
         self.start()
@@ -105,7 +124,8 @@ class Harness():
 
         # Start monitoring loop
         try:
-            while True:
+            start = time.time()
+            while time.time() < start + 10:
                 if prev_time != 0:
 
                     # Create the table
@@ -141,16 +161,26 @@ class Harness():
                 prev_time = curr_time
                 prev_count = curr_count
                 time.sleep(refresh_time)
+
         except KeyboardInterrupt: # Ctrl + C
-            print('Closing threads...')
-            self.s_semaphore.acquire()
-            self.isStarted = False
-            self.s_semaphore.release()
+            print('Received Ctrl + C\nClosing threads...')
+            for t in enumerate():
+                t.alive = False
             time.sleep(3)
             self.LOGFILE.close()
             self.outfile.close()
             print('Output saved to bad.txt')
             return
+
+        print('Times Up!\nClosing threads...')
+        for t in enumerate():
+            t.alive = False
+        time.sleep(3)
+        self.LOGFILE.close()
+        self.outfile.close()
+        print('Output saved to bad.txt')
+        return
+
 
 if __name__ == '__main__':
     try:
