@@ -341,6 +341,7 @@ def getType(filename) -> Fuzz or None:
     
     fuzzer = Fuzz
     type, inputTxt = checkType(filename)
+    print(inputTxt)
     
     if type == TYPE_FAIL:
         return None
