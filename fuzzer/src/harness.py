@@ -73,9 +73,10 @@ class Harness():
                     subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
-                    self.out_semaphore.acquire()
-                    self.outfile.write(fuzzInput + '\n')
-                    self.out_semaphore.release()
+                    if e.returncode != -2:
+                        self.out_semaphore.acquire()
+                        self.outfile.write(fuzzInput + '\n')
+                        self.out_semaphore.release()
                 else:
                     pass
 
