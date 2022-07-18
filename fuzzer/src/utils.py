@@ -175,13 +175,13 @@ class JSON_Fuzz(Fuzz):
             'big_pos': 1111111111111111111111111111111111111111111
         }
         try:
-            self.jsonObj : dict = json.loads(self.input)
+            self.jsonObj = json.loads(self.seed)
         except Exception:
             self.jsonObj = {}
             
     def checkType(self):
         try:
-            json.loads(self.input)
+            json.loads(self.seed)
             return True
         except ValueError:
             return False
@@ -274,7 +274,10 @@ class JSON_Fuzz(Fuzz):
         return mutation
     
     def fuzz(self):
-        return json.dumps(self.mutate())
+        try:
+            return json.dumps(self.mutate())
+        except:
+            return None
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -312,13 +315,11 @@ class JPG_Fuzz(Fuzz):
     def fuzz(self):
         # Placeholder
         return super().fuzz()
-        
 
 def checkType(filename):
     try:
         with open(filename, 'r') as fp:
             inputTxt = fp.read().strip()
-            
             if (JSON_Fuzz(inputTxt).checkType()):
                 return TYPE_JSON, inputTxt
             elif (XML_Fuzz(inputTxt).checkType()):
@@ -332,36 +333,21 @@ def checkType(filename):
     except:
         return TYPE_JPG, inputTxt
 
-def getType(filename) -> Fuzz or str:
-    try:
-        with open(filename, 'r') as fp:
-            inputTxt = fp.read().strip()
-            if (CSV_Fuzz(inputTxt).checkType()):
-                return CSV_Fuzz(inputTxt)
-            elif (JSON_Fuzz(inputTxt).checkType()):
-                return JSON_Fuzz(inputTxt)
-            elif (XML_Fuzz(inputTxt).checkType()):
-                return XML_Fuzz(inputTxt)
-            else:
-                return Plaintext_Fuzz(inputTxt)
-    except IOError:
-        return TYPE_FAIL
-    except:
-        return JPG_Fuzz(inputTxt)
-
-if __name__ == '__main__':
-    print("Sample input: ", sys.argv[1])
+'''
+    Returns fuzzer on success or <None>
+'''
+def getType(filename) -> Fuzz or None:    
+    fuzzer = Fuzz
+    type, inputTxt = checkType(sys.argv[1])
     
-    type = checkType(sys.argv[1])
-            
     if type == TYPE_FAIL:
-        print("Failed to open file/detect input type")
+        return None
     elif type == TYPE_CSV:
         print("Detected CSV")
-        CSV_Fuzz.fuzz()
+        fuzzer = CSV_Fuzz()
     elif type == TYPE_JSON:
         print("Detected JSON")
-        JSON_Fuzz.fuzz()
+        fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
         print("Detected XML")
         XML_Fuzz.fuzz()
@@ -371,4 +357,61 @@ if __name__ == '__main__':
     elif type == TYPE_JPG:
         print("Detected JPG")
         JPG_Fuzz.fuzz()
+    return fuzzer
+    
+    '''
+        try:
+            with open(filename, 'r') as fp:
+                inputTxt = fp.read().strip()
+                
+                if (CSV_Fuzz(inputTxt).checkType()[0]):
+                    return CSV_Fuzz(inputTxt)
+                elif (JSON_Fuzz(inputTxt).checkType()[0]):
+                    return JSON_Fuzz(inputTxt)
+                elif (XML_Fuzz(inputTxt).checkType()[0]):
+                    return XML_Fuzz(inputTxt)
+                else:
+                    return Plaintext_Fuzz(inputTxt)
+        except IOError:
+            return TYPE_FAIL
+        except:
+            return JPG_Fuzz(inputTxt)
+    '''
+
+if __name__ == '__main__':
+    print("Sample input: ", sys.argv[1])
+    
+    fuzzer = getType(sys.argv[1])
+    
+    print(fuzzer)
+    for i in range(20):
+        print(fuzzer.fuzz())
+    
+    
+    
+    # print("type", checkType(sys.argv[1])[0])
+    
+
+    # type, extracted_seed  = checkType(sys.argv[1])
+    # print("identified type",type)
+    # print("inputstr: ", extracted_seed)
+            
+    # if type == TYPE_FAIL:
+    #     print("Failed to open file/detect input type")
+    # elif type == TYPE_CSV:
+    #     print("Detected CSV")
+    #     CSV_Fuzz.fuzz()
+    # elif type == TYPE_JSON:
+    #     print("Detected JSON")
+    #     for i in range(100):
+    #         print(JSON_Fuzz.fuzz())
+    # elif type == TYPE_XML:
+    #     print("Detected XML")
+    #     XML_Fuzz.fuzz()
+    # elif type == TYPE_PLAINTEXT:
+    #     print("Detected Plaintext")
+    #     Plaintext_Fuzz.fuzz()
+    # elif type == TYPE_JPG:
+    #     print("Detected JPG")
+    #     JPG_Fuzz.fuzz()
 
