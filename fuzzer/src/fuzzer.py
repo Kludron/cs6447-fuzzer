@@ -10,25 +10,30 @@ TESTBINARY='tests/csv1'
 TESTSEED='tests/csv1.txt'
 
 def print_type(file):
-    val = checkType(file)
-    if val == TYPE_FAIL:
+    type, inputTxt = checkType(file)
+    
+    if type == TYPE_FAIL:
         print("Failed to open file/detect input type")
-    elif val == TYPE_CSV:
+    elif type == TYPE_CSV:
         print("Detected CSV")
-    elif val == TYPE_JSON:
+    elif type == TYPE_JSON:
         print("Detected JSON")
-    elif val == TYPE_XML:
+        fuzzer = JSON_Fuzz(inputTxt)
+    elif type == TYPE_XML:
         print("Detected XML")
-    elif val == TYPE_PLAINTEXT:
+    elif type == TYPE_PLAINTEXT:
         print("Detected Plaintext")
-    elif val == TYPE_JPG:
-        print("Detected JPG")
+    elif type == TYPE_JPG:
+        print("Detected JPG??")
+        
+        
+        
 
 # getType returns the data from the seed file. Update functions to read the data passed through, rather than the seed file to save from re-opening the seed file.
 def run(program, seed):
     print_type(seed)
     fuzzer = getType(seed)
-    if not fuzzer == TYPE_FAIL:
+    if fuzzer:
         harness = Harness(program, seed, fuzzer)
         harness.monitor()
     else:
