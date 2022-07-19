@@ -18,7 +18,6 @@ def print_type(file):
         print("Detected CSV")
     elif type == TYPE_JSON:
         print("Detected JSON")
-        fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
         print("Detected XML")
     elif type == TYPE_PLAINTEXT:
@@ -32,9 +31,7 @@ def print_type(file):
 # getType returns the data from the seed file. Update functions to read the data passed through, rather than the seed file to save from re-opening the seed file.
 def run(program, seed):
     print_type(seed)
-    print("getting type")
     fuzzer = getType(seed)
-    print("got type")
     if fuzzer:
         harness = Harness(program, seed, fuzzer)
         harness.monitor()

@@ -246,7 +246,8 @@ class JSON_Fuzz(Fuzz):
             'big_neg': -1111111111111111111111111111111111111111111,
             'big_pos': 1111111111111111111111111111111111111111111
         }
-        self.visited = set()
+        self.checked_strings_set = set()
+        
         try:
             self.jsonObj : dict = json.loads(self.seed)
         except Exception:
@@ -272,10 +273,6 @@ class JSON_Fuzz(Fuzz):
         else:
             # otherwise perform random mutation
             mutation = self.dumbMutate()
-        # if mutation in self.visited:
-        #     return self.mutate()
-        # else:
-        #     self.visited.add(mutation)
         return mutation
         
     '''
@@ -351,7 +348,12 @@ class JSON_Fuzz(Fuzz):
         return mutation
     
     def fuzz(self):
-        return json.dumps(self.mutate())
+        mutation = json.dumps(self.mutate())
+        if mutation in self.checked_strings_set:
+            return self.fuzz()
+        else:
+            self.checked_strings_set.add(mutation)
+        return mutation
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
