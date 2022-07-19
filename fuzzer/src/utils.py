@@ -246,6 +246,7 @@ class JSON_Fuzz(Fuzz):
             'big_neg': -1111111111111111111111111111111111111111111,
             'big_pos': 1111111111111111111111111111111111111111111
         }
+        self.visited = set()
         try:
             self.jsonObj : dict = json.loads(self.seed)
         except Exception:
@@ -271,6 +272,10 @@ class JSON_Fuzz(Fuzz):
         else:
             # otherwise perform random mutation
             mutation = self.dumbMutate()
+        # if mutation in self.visited:
+        #     return self.mutate()
+        # else:
+        #     self.visited.add(mutation)
         return mutation
         
     '''
@@ -403,23 +408,31 @@ def checkType(filename):
         return TYPE_FAIL, ''
     except:
         return TYPE_JPG, inputTxt
-
-def getType(filename) -> Fuzz or str:
-    try:
-        with open(filename, 'r') as fp:
-            inputTxt = fp.read().strip()
-            if (CSV_Fuzz(inputTxt).checkType()):
-                return CSV_Fuzz(inputTxt)
-            elif (JSON_Fuzz(inputTxt).checkType()):
-                return JSON_Fuzz(inputTxt)
-            elif (XML_Fuzz(inputTxt).checkType()):
-                return XML_Fuzz(inputTxt)
-            else:
-                return Plaintext_Fuzz(inputTxt)
-    except IOError:
-        return TYPE_FAIL
-    except:
-        return JPG_Fuzz(inputTxt)
+    
+def getType(filename) -> Fuzz or None:    
+    print("getType() - seed: ", filename)
+    
+    fuzzer = Fuzz
+    type, inputTxt = checkType(filename)
+    
+    if type == TYPE_FAIL:
+        return None
+    elif type == TYPE_CSV:
+        print("getType() - Detected CSV")
+        fuzzer = CSV_Fuzz(inputTxt)
+    elif type == TYPE_JSON:
+        print("getType() - Detected JSON")
+        fuzzer = JSON_Fuzz(inputTxt)
+    elif type == TYPE_XML:
+        print("getType() - Detected XML")
+        XML_Fuzz.fuzz(inputTxt)
+    elif type == TYPE_PLAINTEXT:
+        print("getType() - Detected Plaintext")
+        Plaintext_Fuzz.fuzz(inputTxt)
+    elif type == TYPE_JPG:
+        print("getType() - Detected JPG")
+        JPG_Fuzz.fuzz(inputTxt)
+    return fuzzer
 
 if __name__ == '__main__':
     print("Sample input: ", sys.argv[1])
