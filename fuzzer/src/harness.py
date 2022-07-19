@@ -29,6 +29,8 @@ class Harness():
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
         self.counter = 0
         self.c_semaphore = Semaphore()
+        self.crashes = 0
+        self.crashes_semaphore = Semaphore()
 
         self.isStarted = False
         self.s_semaphore = Semaphore()
@@ -82,8 +84,15 @@ class Harness():
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
                     if e.returncode != -2:
+                        self.crashes_semaphore.acquire()
+                        self.crashes += 1
+                        self.crashes_semaphore.release()
                         self.out_semaphore.acquire()
-                        self.outfile.write(fuzzInput + '\n')
+                        self.outfile.write( f"---------------------------------\n"
+                                            f"Crash ID: {self.crashes}\n"
+                                            f"Crash Payload\n"
+                                            f"-------------\n"
+                                            f"{fuzzInput}\n")
                         self.out_semaphore.release()
                 else:
                     pass
@@ -138,6 +147,7 @@ class Harness():
                         "Queue Length":self.queue.qsize(),
                         "Current Rate":curr_rate,
                         "Overall Rate":total_rate,
+                        "Total Crashes":self.crashes,
                     }
                     
                     table_format = "{:<15}" * (len(table.keys()) + 1)
@@ -148,16 +158,16 @@ class Harness():
                     elif sys.platform == 'win32':
                         os.system("cls")
 
-                    print(table_format.format("", *table.keys())) # Prints the headers
-                    print(table_format.format("", *table.values())) # Prints the values
-                    print("Press Ctrl + C to exit.")
-
                     # Update variables
                     curr_time = time.time()
                     curr_count = self.counter
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
+
+                    print(table_format.format("", *table.keys())) # Prints the headers
+                    print(table_format.format("", *table.values())) # Prints the values
+                    print("Press Ctrl + C to exit.")
 
                 prev_time = curr_time
                 prev_count = curr_count
