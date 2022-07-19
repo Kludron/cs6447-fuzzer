@@ -5,7 +5,7 @@ import os
 from queue import Empty, Full, Queue
 import subprocess
 import sys
-from threading import Semaphore, Thread, active_count, enumerate, current_thread
+from threading import Semaphore, Thread, active_count, enumerate, current_thread, main_thread
 import time
 import re
 import signal
@@ -29,11 +29,15 @@ class Harness():
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
         self.counter = 0
         self.c_semaphore = Semaphore()
+
         self.crashes = 0
         self.crashes_semaphore = Semaphore()
 
         self.isStarted = False
         self.s_semaphore = Semaphore()
+
+        self.success = False
+        self.success_semaphore = Semaphore()
 
         self.out_semaphore = Semaphore()
         self.outfile = open('bad.txt', 'w')
@@ -70,7 +74,7 @@ class Harness():
     def test(self):
         t = current_thread()
         t.alive = True
-        while t.alive == True:
+        while t.alive == True and self.success == False:
             try:
                 fuzzInput = self.queue.get(timeout=0.2)
             except Empty:
@@ -84,16 +88,11 @@ class Harness():
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
                     if e.returncode != -2:
-                        self.crashes_semaphore.acquire()
-                        self.crashes += 1
-                        self.crashes_semaphore.release()
                         self.out_semaphore.acquire()
-                        self.outfile.write( f"---------------------------------\n"
-                                            f"Crash ID: {self.crashes}\n"
-                                            f"Crash Payload\n"
-                                            f"-------------\n"
-                                            f"{fuzzInput}\n")
-                        self.out_semaphore.release()
+                        self.outfile.write(fuzzInput + '\n')
+                        self.success_semaphore.acquire()
+                        self.success = True
+                        self.success_semaphore.release()
                 else:
                     pass
 
@@ -108,15 +107,32 @@ class Harness():
         t.alive = True
         for _ in range(self.MAX_TESTS):
             if t.alive == True:
+                '''
+                # Legit input to valid that no segfault occurs initially before fuzzer output used
+                for i in range(10000):
+                    try:
+                        self.queue.put(r'{"len": 12, "input": "AAAABBBBCCCC", "more_data": ["a", "bb"]}')                    
+                    except Full:
+                        pass
+                '''
                 try:
                     input = self.fuzzer.fuzz()
                     if input != None:
-                        self.queue.put(self.fuzzer.fuzz())
+                        self.queue.put(self.fuzzer.fuzz())          
                 except Full:
                     pass
             else:
                 sys.exit(0)
 
+
+    def finish(self):
+        print('Closing threads...')
+        for t in enumerate():
+            t.alive = False
+        time.sleep(3)
+        self.LOGFILE.close()
+        self.outfile.close()
+        print('Output saved to bad.txt')  
 
 
     def monitor(self, refresh_time=2) -> None:
@@ -136,7 +152,7 @@ class Harness():
         try:
             start = time.time()
             while time.time() < start + 190:
-                if prev_time != 0:
+                if prev_time != 0 and self.success == False:
 
                     # Create the table
 
@@ -169,27 +185,22 @@ class Harness():
                     print(table_format.format("", *table.values())) # Prints the values
                     print("Press Ctrl + C to exit.")
 
+                elif self.success == True:
+                    print('Success!')
+                    self.finish()
+                    return
+
                 prev_time = curr_time
                 prev_count = curr_count
                 time.sleep(refresh_time)
 
         except KeyboardInterrupt: # Ctrl + C
-            print('Received Ctrl + C\nClosing threads...')
-            for t in enumerate():
-                t.alive = False
-            time.sleep(3)
-            self.LOGFILE.close()
-            self.outfile.close()
-            print('Output saved to bad.txt')
+            print('Received Ctrl + C')
+            self.finish()
             return
 
-        print('Times Up!\nClosing threads...')
-        for t in enumerate():
-            t.alive = False
-        time.sleep(3)
-        self.LOGFILE.close()
-        self.outfile.close()
-        print('Output saved to bad.txt')
+        print('Times Up!')
+        self.finish()
         return
 
 
