@@ -34,7 +34,9 @@ def run(program, seed):
     fuzzer = getType(seed)
     if fuzzer:
         harness = Harness(program, seed, fuzzer)
-        harness.monitor()
+        harness.start()
+        while True:
+            pass
     else:
         print('Failed to open or detect seed type.')
 

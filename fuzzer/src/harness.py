@@ -68,9 +68,6 @@ class Harness():
                 thread = Thread(target=self.fuzz, daemon=True)
                 thread.start()
 
-
-
-
     def test(self):
         t = current_thread()
         t.alive = True
@@ -84,7 +81,9 @@ class Harness():
                     self.c_semaphore.acquire()
                     self.counter += 1
                     self.c_semaphore.release()
-                    subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                    with subprocess.Popen(["gdb", self.program, "--command=harness.gdb"], input=fuzzInput, check=True, stdout=PIPE, text=True) as process:
+                        print(process.pid)
+                    
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
                     if e.returncode != -2:
