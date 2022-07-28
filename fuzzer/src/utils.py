@@ -1,13 +1,13 @@
 # Utilities for COMP6447 Fuzzer
+import random
+import string
 import sys
 import json
+from tkinter import E
 import xml.etree.ElementTree as ElementTree
-from pwn import *
+# from pwn import *
 import copy
-from random import choice
-# from tmp_csvFuzz import CSV_Fuzz
-
-# from csv_fuzzer import run_csv_fuzzer
+from random import choice, randint
 
 TYPE_FAIL = -1
 TYPE_CSV = 0
@@ -27,6 +27,43 @@ class Fuzz():
     def fuzz(self):
         # The below is just a placeholder for testing purposes
         return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
+    
+    
+    '''
+        Random Int/String generators
+    '''
+    def generateInt(self):
+        return randint(-2147483647, 2147483647)
+    def generateOverflowedInt(self):
+        if (randint(0,1) == 0):
+            return randint(-21474836470000000, -2147483648)
+        else:
+            return randint(2147483647, 21474836470000000)
+    def generateString(self):
+        return ''.join(random.choices(string.printable, k=randint(1, 20)))
+    
+    
+    '''
+        Random String mutators
+    '''
+    def flipRandomBit(self, s):
+        if s == '':
+            return s
+        idx = randint(0, len(s) - 1)
+        c = s[idx]
+        mask = 1 << randint(0,6)    # select random bit position to flip
+        flipped = chr(ord(c) ^ mask)    # xor the random character and bitmask
+        return s[:idx] + flipped + s[idx + 1:]
+    def deleteRandomChar(self, s):
+        if s == '':
+            return s
+        idx = randint(0, len(s) - 1)
+        return s[:idx] + s[idx + 1:]
+    def insertRandomChar(self, s):
+        idx = randint(0, len(s))
+        return s[:idx] + chr(randint(0, 127)) + s[idx:]
+    
+    
 
 class CSV_Fuzz(Fuzz):
     
@@ -99,145 +136,11 @@ class CSV_Fuzz(Fuzz):
             self.__generate()
             return self.fuzz()
 
-# # CSV Fuzzer
-# class CSV_Fuzz(Fuzz):
-#     def __init__(self, seed):
-#         super().__init__(seed)
-#         self.fuzzList = list()
-
-#     def checkType(self):
-#         self.lines = self.seed.split("\n")
-#         first_row_commas = self.lines[0].count(",")
-        
-#         for line in self.lines:
-#             if line.count(",") != first_row_commas or first_row_commas == 0:
-#                 return False
-#         return True
-
-#     """
-#     Mutate the field data, if the line is not empty, with string of characters.
-#     """
-#     def __mutate_strings(self, line): # [TODO]
-#         # If line is empty, return empty line back.
-#         if not line:
-#             return line
-#         # Else, add string of chars at the end to the line.
-#         # Random letter between A to Z.
-#         random_letter = random.choice(string.ascii_uppercase)
-#         i = random.randint(0, 100)
-#         # Add the random letter 'i' times at the end of the line, separated by commas.
-#         return line + (i * (random_letter + ","))
-
-#     """
-#     Mutate the field data, if the line is not empty, with integer.
-#     """
-#     def __mutate_ints(self, line): #[TODO]
-#         # If line is empty, return empty line back.
-#         if not line:
-#             return line
-#         # Else, mutate field's data with ints.
-#         else:
-#             newRow = []
-#             for element in line.split(','):
-#                 rand_i = random.randint(0, len(element)-1)
-#                 newstring = element[:rand_i] + random.choice(string.digits) + element[rand_i+1:]
-#                 newRow.append(newstring)
-#             # line_len = len(line.split(",")) - 1
-#             # # i'th field is to be changed with value j.
-#             # i = random.randint(0, line_len)
-#             # j = random.randint(0, 999)
-#             # # Strings are immutable in python3 [TODO]
-#             # newstring = line[:i] + str(j) + line[i+1:]
-#             # # line[i] = j
-#             # # Change back the line and return.
-#             # line = str(line)
-#             return ",".join(newRow) + "\n"
-
-#             # a,b,5,d
-
-#     """
-#     Mutate the number of lines or the size of the line.
-#     """
-#     def __mutate_line(self, line) -> str: #[TODO]
-#         # Random number between 0 and 100.
-#         i = random.randint(0, 100)
-        
-#         # 20% chance: delete the line.
-#         if i < 20:
-#             return ''
-#         # 20% chance: do nothing.
-#         elif i < 40:
-#             return line
-#         # 20% chance: add a new line to the current line with all empty fields.
-#         elif i < 60:
-#             line_len = len(line.split(",")) - 1
-#             line = line + "\n" + ("," * line_len)
-#         # 20% chance: duplicate the line 'i' times.
-#         elif i < 80:
-#             # If line is empty, return empty line.
-#             if line.rstrip() == '':
-#                 return line
-#             # Else, duplicate the line.
-#             else:
-#                 return (i * (line + "\n"))
-#         # 20% chance: increase line length by 'i' times.
-#         # i here is between 80 and 100.
-#         else:
-#             new_line = []
-#             line = line.split(",")
-#             for l in line:
-#                 l = i * l.rstrip()
-#                 new_line.append(l)
-#             return ",".join(new_line)
-
-#     """
-#     Run mutations on the input and return the new mutated input as a string.
-#     """
-#     def __mutate_input(self, input:list): #[TODO]
-#         new_mutated_input = []
-
-#         # Run mutations per every line.
-#         for line in input:
-#             i = random.randint(0, 100)
-#             # 50% chance that number or size of the line is mutated.
-#             if i < 50:
-#                 new_mutated_input.append(self.__mutate_line(line))
-#             # 25% chance that fields are mutated with ints.
-#             elif i > 50 and i <= 75:
-#                 new_mutated_input.append(self.__mutate_ints(line))
-#             # 25% chance that fields are mutated with strings or chars.
-#             else:
-#                 new_mutated_input.append(self.__mutate_strings(line))
-            
-#             try:
-#                 return ''.join(new_mutated_input)
-#             except TypeError:
-#                 return ''
-
-#     """
-#     Function to run the csv fuzzer.
-#     """
-#     def mutate(self) -> list:
-
-#         for _ in range(999):
-#             mutated_input = self.__mutate_input(self.seed.split('\n')[1:])
-#             mutated_input = self.seed.split('\n')[0] + '\n' + mutated_input
-#             self.fuzzList.append(mutated_input)
-#         return self.fuzzList
-
-#     def fuzz(self):
-#         try:
-#             return self.fuzzList.pop(0)
-#         except IndexError:
-#             # Regenerate a fuzzer input list
-#             self.mutate()
-#             return self.fuzz() # This could infinite loop [TODO]
-
 # JSON Fuzzer
 class JSON_Fuzz(Fuzz):
     def __init__(self, seed):
         super().__init__(seed)
-        self.basic_checks = {
+        self.bad_input = {
             'buffer_overflow': 'A'*999,
             'format': '%p',
             'pos': 1,
@@ -245,7 +148,8 @@ class JSON_Fuzz(Fuzz):
             'zero': 0,
             'big_neg': -1111111111111111111111111111111111111111111,
             'big_pos': 1111111111111111111111111111111111111111111
-        }
+        } 
+        self.basic_checks = self.bad_input  # this is mutable
         self.checked_strings_set = set()
         
         try:
@@ -305,6 +209,32 @@ class JSON_Fuzz(Fuzz):
         self.basic_checks.pop(first_pair[0])
         return mutation
     
+    '''
+        Add token to the json object
+    '''
+    def addToken(self, mutation):
+        randomToken = chr(randint(0, 127))
+        whichType = randint(0, 2)
+        if whichType == 0:
+            # int
+            mutation[randomToken] = randint()
+        elif whichType == 1:
+            # string
+            mutation[randomToken] = self.mutateString('')
+        else:
+            # list
+            pass
+        
+        return mutation
+    
+
+    
+    '''
+        Remove tokens from the object
+    '''
+    def removeToken(self, ):
+        pass
+    
     def mutateString(self, s):
         methods = [
             self.deleteRandomChar,
@@ -315,25 +245,6 @@ class JSON_Fuzz(Fuzz):
         method = choice(methods)
         return method(s)
     
-    def deleteRandomChar(self, s):
-        if s == '':
-            return s
-        idx = randint(0, len(s) - 1)
-        return s[:idx] + s[idx + 1:]
-
-    def insertRandomChar(self, s):
-        idx = randint(0, len(s))
-        return s[:idx] + chr(randint(30, 127)) + s[idx:]    # insert random ascii character (excluding )
-    
-    def flipRandomBit(self, s):
-        if s == '':
-            return s
-        idx = randint(0, len(s) - 1)
-        c = s[idx]
-        mask = 1 << randint(0,6)    # select random bit position to flip
-        flipped = chr(ord(c) ^ mask)    # xor the random character and bitmask
-        return s[:idx] + flipped + s[idx + 1:]
-
     def multipleStringMutations(self, s):
         methods = [
             self.deleteRandomChar,
@@ -347,13 +258,20 @@ class JSON_Fuzz(Fuzz):
             mutation = method(mutation)
         return mutation
     
+    def isJson(self, mutation):
+        try:
+            return json.dumps(mutation)
+        except:
+            return None
+            
     def fuzz(self):
-        mutation = json.dumps(self.mutate())
-        if mutation in self.checked_strings_set:
-            return self.fuzz()
+        mutation = self.mutate()
+        mutationJSON = self.isJson(mutation)
+        if (mutationJSON and (mutationJSON not in self.checked_strings_set)):
+            self.checked_strings_set.add(mutationJSON)
+            return mutationJSON
         else:
-            self.checked_strings_set.add(mutation)
-        return mutation
+            return self.fuzz()
 
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
@@ -437,25 +355,33 @@ def getType(filename) -> Fuzz or None:
     return fuzzer
 
 if __name__ == '__main__':
-    print("Sample input: ", sys.argv[1])
+    fuzzer = getType(sys.argv[1])
     
-    type = checkType(sys.argv[1])
+    
+    
+    for i in range(10):
+        # print(fuzzer.generateOverflowedInt())
+        print(fuzzer.generateString())
+        # print(fuzzer.fuzz())
             
-    if type == TYPE_FAIL:
-        print("Failed to open file/detect input type")
-    elif type == TYPE_CSV:
-        print("Detected CSV")
-        CSV_Fuzz.fuzz()
-    elif type == TYPE_JSON:
-        print("Detected JSON")
-        JSON_Fuzz.fuzz()
-    elif type == TYPE_XML:
-        print("Detected XML")
-        XML_Fuzz.fuzz()
-    elif type == TYPE_PLAINTEXT:
-        print("Detected Plaintext")
-        Plaintext_Fuzz.fuzz()
-    elif type == TYPE_JPG:
-        print("Detected JPG")
-        JPG_Fuzz.fuzz()
+    
+    # if type == TYPE_FAIL:
+    #     print("Failed to open file/detect input type")
+    # elif type == TYPE_CSV:
+    #     print("Detected CSV")
+    #     CSV_Fuzz.fuzz()
+    # elif type == TYPE_JSON:
+    #     print("Detected JSON")
+    #     JSON_Fuzz.fuzz()
+    # elif type == TYPE_XML:
+    #     print("Detected XML")
+    #     XML_Fuzz.fuzz()
+    # elif type == TYPE_PLAINTEXT:
+    #     print("Detected Plaintext")
+    #     Plaintext_Fuzz.fuzz()
+    # elif type == TYPE_JPG:
+    #     print("Detected JPG")
+    #     JPG_Fuzz.fuzz()
+        
+    
 
