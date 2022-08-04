@@ -5,7 +5,7 @@ from pygdbmi.constants import GdbTimeoutError
 from pwn import cyclic_gen
 from pprint import pprint
 from queue import Queue
-from time import time
+import time
 import hashlib
 
 def run_external_command(cmd : str) -> str:
@@ -68,39 +68,47 @@ def run(filename) -> str:
         print("binary does not have any functions")
     else:
         func_bpoints = makeTempBreakpoints(functions, func_bpoints)
-    print(f"getFunctions breakpoints:")
-    pprint(func_bpoints)
+    #print(f"getFunctions breakpoints:")
+    #pprint(func_bpoints)
     #pprint('___________________________________________')
 
     #create breakpoint at _exit to rerun if exits cleanly
-    makeBreakpoints(["_exit"], [])
+    #pprint("Creating catch")
+    #gdb.write(f'catch syscall exit exit_group')
+    response = gdb.write(f'start')
+    #pprint(response)
+    response = gdb.write(f'break *&_exit')
+    #pprint(response)
     response = gdb.write(f'commands')
-    print(response)
+    #pprint(response)
     response = gdb.write(f'run')
-    print(response)
+    #pprint(response)
     response = gdb.write(f'end')
-    print(response)
+    #pprint(response)
+    response = gdb.write(f'info breakpoints')
+    #pprint(response)
+    #pprint("Completed catch")
    
     #code_path = []
     #code_paths = []
     response = gdb.write('run')
-    pprint('___________________________________________')
+    #pprint('___________________________________________')
     backtrace = {}
     while True:
-        pprint(response)
+        #pprint(response)
         if response[-1]["message"] == 'stopped':
             if response[-1]["payload"]["reason"] == 'breakpoint-hit':           #Occurs when permanent breakpoint hit
-                cpID = time()
+                cpID = time.time()
                 if response[-1]["payload"]["frame"]["addr"] in input_bpoints:   #If the breakpoint was for an input fuction create a checkpoint
-                    print('Breakpoint is input function')
+                    #print('Breakpoint is input function')
                     cpCreate(cpID)
                 response = gdb.write(f'backtrace {cpID}')                       #Store the path   
             elif response[-1]["payload"]["reason"] == 'exited-normally':        #Program exited
                 print('Program did not crash')        
                 break
         elif response[-1]["message"] == 'breakpoint-deleted':           #Occurs with temp breakpoints
-            print('Hit function and deleting a temporary breakpoint')
-            cpID = time()
+            print(f'Hit function for first time, deleting a temporary breakpoint')
+            cpID = time.time()
             response = gdb.write(f'backtrace {cpID}') 
         elif response[-1]["message"] == 'done':
             if 'backtrace' in response[0]["payload"]:             #Parse results of backtrace command
@@ -119,9 +127,12 @@ def run(filename) -> str:
                     print('Found new path')         
                 response = gdb.write('continue')
         elif response[-1]["message"] == 'running':
-            print('got running message')        
-            response = gdb.write('continue')    
-        pprint('___________________________________________')
+            #pprint('#############################################################################')
+            print('Supplying input')     
+            #pprint('#############################################################################') 
+            response = gdb.write('AAAAAAA')    
+            #pprint(response)
+        #pprint('___________________________________________')
 
 
 
@@ -161,11 +172,22 @@ def getInputFunctions(output:str) -> list:
 
 def makeBreakpoints(points, bplist) -> True:
     for point in points:
+        print("-----------------------------")
+        print(point)
         response = gdb.write(f'break *{point[0]}')
+        print(response)
         #pprint(f"makeBreakpoints - response break *{point[1]}:\n{response}\n----------")  
         if response[2]['payload']['bkpt']['type'] == 'breakpoint':
-            bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
-                                                               "at" : response[2]['payload']['bkpt']['at']}
+            if 'at' in response[2]['payload']['bkpt']:
+                print(response[2]['payload']['bkpt'])
+                print(response[2]['payload']['bkpt']['addr'])
+                bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
+                                                                   "at"     : response[2]['payload']['bkpt']['at']}
+            else:
+                print(response[2]['payload']['bkpt'])
+                print(response[2]['payload']['bkpt']['addr'])
+                bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
+                                                                   "at"     : response[2]['payload']['bkpt']['number']}            
     return bplist
 
 def makeTempBreakpoints(points, bplist) -> True:
@@ -174,7 +196,7 @@ def makeTempBreakpoints(points, bplist) -> True:
         #pprint(f"makeBreakpoints - response break *{point[1]}:\n{response}\n----------")  
         if response[2]['payload']['bkpt']['type'] == 'breakpoint':
             bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
-                                                               "at" : response[2]['payload']['bkpt']['at']}
+                                                               "at"     : response[2]['payload']['bkpt']['at']}
     return bplist
 
 def isGoodFunction(line):
