@@ -125,7 +125,7 @@ class Harness():
                     self.outfile.write(fuzzInput + '\n')
                     self.success_semaphore.acquire()
                     self.success = True
-                    self.crash_type = Error(e.returncode)
+                    self.crash_type = Error(e.returncode).name
                     # if e.returncode == SIGHUP:
                     #     self.crash_type = "SIGHUP"
                     # elif e.returncode == SIGINT:
@@ -316,4 +316,4 @@ if __name__ == '__main__':
     #     print(e.args, e.returncode)
 
     e = -4
-    print(Error(e).__str__)
+    print(Error(e))
