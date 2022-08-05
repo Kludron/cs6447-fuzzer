@@ -328,7 +328,9 @@ def checkType(filename):
         return TYPE_FAIL, ''
     except:
         return TYPE_JPG, inputTxt
-    
+
+
+# From seed file, detect type and return type-specific fuzzer object
 def getType(filename) -> Fuzz or None:    
     print("getType() - seed: ", filename)
     
