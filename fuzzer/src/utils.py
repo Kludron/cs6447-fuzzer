@@ -63,7 +63,22 @@ class Fuzz():
         idx = randint(0, len(s))
         return s[:idx] + chr(randint(0, 127)) + s[idx:]
     
-    
+    # take a bytearray and flip random bytes
+    def bytes_bit_flip(self, data):
+        length = len(data) - 4
+        num_of_flips = int(length * .01)
+        indexes = []
+        flip_array = [1,2,4,8,16,32,64,128]
+        counter = 0
+        while counter < num_of_flips:
+            indexes.append(random.choice(range(0,length)))
+            counter += 1
+        for x in indexes:
+            mask = random.choice(flip_array)
+            data[x] = data[x] ^ mask
+
+        return data
+        
 
 class CSV_Fuzz(Fuzz):
     
