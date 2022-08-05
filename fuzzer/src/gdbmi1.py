@@ -154,17 +154,10 @@ def getInputFunctions(output:str) -> list:
 
 def makeBreakpoints(points, bplist) -> True:
     for point in points:
-        #print(point)
         response = gdb.write(f'break *{point[0]}')
-        #print(response)
-        #pprint(f"makeBreakpoints - response break *{point[1]}:\n{response}\n----------")  
         if response[2]['payload']['bkpt']['type'] == 'breakpoint':
-            if 'at' in response[2]['payload']['bkpt']:
-                bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
-                                                                   "at"     : response[2]['payload']['bkpt']['at']}
-            else:
-                bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
-                                                                   "at"     : response[2]['payload']['bkpt']['number']}            
+            bplist[response[2]['payload']['bkpt']['addr']] = { "number" : response[2]['payload']['bkpt']['number'],
+                                                               "at"     : response[2]['payload']['bkpt']['at']}        
     return bplist
 
 def makeTempBreakpoints(points, bplist) -> True:
