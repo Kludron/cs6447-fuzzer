@@ -38,7 +38,7 @@ class Gdb():
     def start(self) -> None:
         # Get all functions
         func_info = self.__getConsole(self.__write('info functions'))
-        functions = self.__getFunctions(func_info, specifier=self.__isInputFunction)
+        functions = self.__getFunctions(func_info, specifier=self.__isGoodFunction)
         
         # Get all input functions
         input_funcs = self.__getFunctions(func_info, specifier=self.__isInputFunction)
@@ -138,10 +138,10 @@ class Gdb():
                 response = self.__write(payload)
 
             else:
-                # print("="*20 + "Unhandled" + "="*20)
-                # print(message)
-                # print(response)
-                # print(payload)
+                print("="*20 + "Unhandled" + "="*20)
+                print(message)
+                print(response)
+                print(payload)
                 break
 
         return payload
