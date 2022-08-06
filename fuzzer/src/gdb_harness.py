@@ -17,7 +17,8 @@ from utils import Fuzz
 from utils import CSV_Fuzz
 
 class Gdb():
-    def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz, thread, semaphore, counter) -> None:
+    def __init__(self, gdb: GdbController, binary: str, queue: Queue, thread) -> None:
+    # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz, thread, semaphore, counter) -> None:
     # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz) -> None:
         self.gdb = gdb
         self.binary = binary
@@ -26,11 +27,12 @@ class Gdb():
         self.input_bpoints = dict()
         self.backtrace = dict()
         self.response = list()
-        self.DEFAULT_TIMEOUT = 0.1
-        self.fuzzer = fuzzer
+        self.DEFAULT_TIMEOUT = 0.36
+        # self.fuzzer = fuzzer
         self.thread = thread
-        self.semaphore = semaphore
-        self.counter = counter
+        # self.semaphore = semaphore
+        # self.counter = counter
+        self.queue = queue
 
         if not os.path.isfile(binary):
             raise FileNotFoundError
@@ -38,9 +40,8 @@ class Gdb():
         self.__write(f'file {binary}')
 
     def start(self) -> None:
-        print(self.binary)
         # Get all functions
-        func_info = self.__getConsole(self.__write('info functions'))
+        func_info = self.__getConsole(self.gdb.write('info functions'))
         functions = self.__getFunctions(func_info, specifier=self.__isGoodFunction)
         
         # Get all input functions
@@ -82,7 +83,7 @@ class Gdb():
                     # print(payload)
                     break
             else:
-                self.__write('continue')
+                self.__write('finish')
                 response = self.__write('run')
 
             # print(message)
@@ -107,7 +108,7 @@ class Gdb():
                         pass
                     finally:
                         # Store the path
-                        response = self.__write(f'backtrace {cpID}')
+                        response = self.gdb.write(f'backtrace {cpID}')
                 
                 # Check if the program exited normally
                 elif reason == 'exited-normally':
@@ -117,18 +118,24 @@ class Gdb():
 
                 ###### [TODO] What about if the program crashes?
                 else:
-                    # print("="*20 + "Unhandled" + "="*20)
-                    # print(reason)
-                    # print(output)
-                    # print(response)
-                    # print(payload)
-                    break
+                    try:
+                        reason = output['reason']
+                        if reason == 'signal-recieved':
+                            return (payload, output['signal-name'])
+                    except (KeyError):
+                        print("="*20 + "Unhandled" + "="*20)
+                        print(reason)
+                        print(output)
+                        # print(response)
+                        # print(payload)
+                    finally:
+                        break
 
             # Check if temporary breakpoint is hit
             elif message == 'breakpoint-deleted':
                 # print(f'Hit function for first time, deleting a temporary breakpoint')
                 cpID = time.time()
-                response = self.__write(f'backtrace {cpID}')
+                response = self.gdb.write(f'backtrace {cpID}')
 
             # Check if previous execute command is completed and returning  
             elif message == 'done':
@@ -142,12 +149,13 @@ class Gdb():
 
             # Check if the program is waiting for input
             elif message == 'running':
-                # print('Supplying input')
-                payload = self.fuzzer.fuzz()
-                self.semaphore.acquire()
-                print(self.counter)
-                self.counter += 1
-                self.semaphore.release()
+                # payload = self.fuzzer.fuzz()
+                payload = self.queue.get(timeout=0.2)
+                # print(payload)
+                # self.semaphore.acquire()
+                # print(self.counter)
+                # self.counter += 1
+                # self.semaphore.release()
                 # print(payload)
                 # payload = 'header,must,stay,intact\n'
                 # payload += 'a,a,a,a\n' * 120
@@ -155,7 +163,10 @@ class Gdb():
 
             else:
                 self.__setResumeOnExit
-        return payload
+        if self.thread.alive:
+            return payload, response
+        else:
+            return None
 
 
     ##############################
@@ -352,12 +363,12 @@ class Gdb():
 
     def __checkpointRestore(self, cpID):
         #Restore to base checkpoint thread, update curr checkpoint thread and delete old checkpoint thread
-        self.__getConsole(self.__write(f'restart {cpoints[cpID]["base"]}'))
-        self.__getConsole(self.__write(f'delete checkpoint {cpoints[cpID]["curr"]}'))
-        cp = self.__getConsole(self.__write(f'checkpoint'))
+        self.__write(f'restart {cpoints[cpID]["base"]}')
+        self.__write(f'delete checkpoint {cpoints[cpID]["curr"]}')
+        cp = self.__getConsole(self.gdb.write(f'checkpoint'))
         cp_num = cp.split()[1].strip(":")
         self.cpoints[cpID]["curr"] = cp_num
-        self.__getConsole(self.__write(f'restart {cpoints[cpID]["curr"]}'))
+        self.__write(f'restart {cpoints[cpID]["curr"]}')
         # print(self.__getConsole(self.__write(f'info checkpoint')))
 
     def __checkpointCreate(self, cpID):

@@ -78,7 +78,7 @@ class Harness():
         self.success_semaphore = Semaphore()
 
         self.out_semaphore = Semaphore()
-        self.outfile = open('bad.txt', 'w')
+        self.outfile = open('bad.txt', 'a')
 
 
     def start(self) -> None:
@@ -113,26 +113,36 @@ class Harness():
         while t.alive == True and self.success == False:
             try:
                 # Note: GdbTesting ignores this. This, therefore, renders the fuzz function as unused.
-                fuzzInput = self.queue.get(timeout=0.2)
+                # fuzzInput = self.queue.get(timeout=0.2)
+                fuzzInput = "header,must,stay,intact"
+                pass
             except Empty:
                 pass
             else:
                 try:
-                    self.c_semaphore.acquire()
-                    self.counter += 1
-                    self.c_semaphore.release()
+                    # self.c_semaphore.acquire()
+                    # self.counter += 1
+                    # self.c_semaphore.release()
 
                     # GDB Testing
-                    payload = Gdb(GdbController(), self.program, self.fuzzer, t).start()
+                    payload = Gdb(GdbController(), self.program, self.queue, t).start()
+                    if payload:
+                        try:
+                            string, signal = payload
+                            fuzzInput = string
+                            raise subprocess.CalledProcessError(signal, fuzzInput)
+                        except (ValueError):
+                            raise subprocess.CalledProcessError(Error.SIGKILL, "cmd")
 
-                    subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
-                    self.LOGFILE.write(fuzzInput+'\n...\n')
+                    # subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
+                    # self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
                     self.out_semaphore.acquire()
                     self.outfile.write(fuzzInput + '\n')
                     self.success_semaphore.acquire()
                     self.success = True
-                    self.crash_type = Error(e.returncode).name
+                    # self.crash_type = Error(e.returncode).name
+                    self.crash_type = e.returncode
                     self.success_semaphore.release() 
         sys.exit(0)
 
@@ -143,7 +153,7 @@ class Harness():
         """
         t = current_thread()
         t.alive = True
-        for _ in range(self.MAX_TESTS):     
+        for _ in range(self.MAX_TESTS):
             if t.alive == True:
                 '''
                 # Legit input to validate that no segfault occurs initially before fuzzer output used
@@ -156,7 +166,10 @@ class Harness():
                 try:
                     input = self.fuzzer.fuzz()
                     if input != None:
-                        self.queue.put(self.fuzzer.fuzz())          
+                        self.queue.put(self.fuzzer.fuzz())
+                        self.c_semaphore.acquire()
+                        self.counter += 1
+                        self.c_semaphore.release()         
                 except Full:
                     pass
             else:
@@ -220,7 +233,7 @@ class Harness():
 
                     # Update variables
                     curr_time = time.time()
-                    curr_count = self.counter
+                    curr_count = self.counter - self.QUEUE_SIZE
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
