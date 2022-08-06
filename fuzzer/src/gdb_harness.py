@@ -17,8 +17,8 @@ from utils import Fuzz
 from utils import CSV_Fuzz
 
 class Gdb():
-    # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz, thread) -> None:
-    def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz) -> None:
+    def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz, thread, semaphore, counter) -> None:
+    # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz) -> None:
         self.gdb = gdb
         self.binary = binary
         self.cpoints = dict()
@@ -26,9 +26,11 @@ class Gdb():
         self.input_bpoints = dict()
         self.backtrace = dict()
         self.response = list()
-        self.DEFAULT_TIMEOUT = 0.36
+        self.DEFAULT_TIMEOUT = 0.1
         self.fuzzer = fuzzer
-        # self.thread = thread
+        self.thread = thread
+        self.semaphore = semaphore
+        self.counter = counter
 
         if not os.path.isfile(binary):
             raise FileNotFoundError
@@ -36,6 +38,7 @@ class Gdb():
         self.__write(f'file {binary}')
 
     def start(self) -> None:
+        print(self.binary)
         # Get all functions
         func_info = self.__getConsole(self.__write('info functions'))
         functions = self.__getFunctions(func_info, specifier=self.__isGoodFunction)
@@ -65,10 +68,11 @@ class Gdb():
         response = self.__write('run')
         # Set the default payload
         payload = ""
-        # while self.thread.alive:
-        print(self.__getConsole(self.gdb.write('info breakpoints')))
+        while self.thread.alive:
+        # print(self.__getConsole(self.gdb.write('info breakpoints')))
         # return
-        while True:
+        # while True:
+            
             if response:
                 try:
                     response = response[-1]
@@ -81,7 +85,7 @@ class Gdb():
                 self.__write('continue')
                 response = self.__write('run')
 
-            print(message)
+            # print(message)
             # Check if persistent breakpoint is hit, or program has exited
             if message == 'stopped':
                 try:
@@ -89,7 +93,7 @@ class Gdb():
                     reason = output['reason']
                 except (KeyError) as e:
                     break
-                print(reason)
+                # print(reason)
                 # Check if persistent breakpoint is hit
                 if reason == 'breakpoint-hit': 
                     cpID = time.time()
@@ -113,11 +117,11 @@ class Gdb():
 
                 ###### [TODO] What about if the program crashes?
                 else:
-                    print("="*20 + "Unhandled" + "="*20)
-                    print(reason)
-                    print(output)
-                    print(response)
-                    print(payload)
+                    # print("="*20 + "Unhandled" + "="*20)
+                    # print(reason)
+                    # print(output)
+                    # print(response)
+                    # print(payload)
                     break
 
             # Check if temporary breakpoint is hit
@@ -140,12 +144,17 @@ class Gdb():
             elif message == 'running':
                 # print('Supplying input')
                 payload = self.fuzzer.fuzz()
-                print(payload)
+                self.semaphore.acquire()
+                print(self.counter)
+                self.counter += 1
+                self.semaphore.release()
+                # print(payload)
                 # payload = 'header,must,stay,intact\n'
                 # payload += 'a,a,a,a\n' * 120
                 response = self.__write(payload)
 
-            else:__setResumeOnExit
+            else:
+                self.__setResumeOnExit
         return payload
 
 
@@ -267,7 +276,6 @@ class Gdb():
         try:
             return self.gdb.write(content, timeout_sec=self.DEFAULT_TIMEOUT)
         except GdbTimeoutError:
-            print("Timed out")
             return []
 
     def __setResumeOnExit(self, breakpoint) -> None:
