@@ -48,7 +48,7 @@ class Gdb():
             # Binary does not have any input functions
             raise Exception("Could not detect any input functions")
         else:
-            self.input_bpoints = self.__makeBreakpoints(input_funcs, self.input_bpoints)
+            self.input_bpoints = self.__makeBreakpoints(input_funcs, self.input_bpoints, bktype='break')
         
         # Set temporary breakpoints at all functions
         if len(functions) < 1:
@@ -66,13 +66,20 @@ class Gdb():
         # Set the default payload
         payload = ""
         # while self.thread.alive:
+        print(self.__getConsole(self.gdb.write('info breakpoints')))
+        # return
         while True:
-            try:
-                response = response[-1]
-                message = response['message']
-            except (TypeError, KeyError) as e:
-                # print(response)
-                break
+            if response:
+                try:
+                    response = response[-1]
+                    message = response['message']
+                except (TypeError, KeyError, IndexError) as e:
+                    # print(response)
+                    # print(payload)
+                    break
+            else:
+                self.__write('continue')
+                response = self.__write('run')
 
             print(message)
             # Check if persistent breakpoint is hit, or program has exited
@@ -133,17 +140,12 @@ class Gdb():
             elif message == 'running':
                 # print('Supplying input')
                 payload = self.fuzzer.fuzz()
+                print(payload)
                 # payload = 'header,must,stay,intact\n'
                 # payload += 'a,a,a,a\n' * 120
                 response = self.__write(payload)
 
-            else:
-                print("="*20 + "Unhandled" + "="*20)
-                print(message)
-                print(response)
-                print(payload)
-                break
-
+            else:__setResumeOnExit
         return payload
 
 
@@ -258,13 +260,14 @@ class Gdb():
     def __write(self, content:str) -> list:
         """
         params:
-            :content: The string to send to self.__write()
+            :content: The string to send to self.gdb.write()
         description:
-            This is just to simplify all self.__write() with the same timeout period
+            This is just to simplify all self.gdb.write() with the same timeout period
         """
         try:
             return self.gdb.write(content, timeout_sec=self.DEFAULT_TIMEOUT)
         except GdbTimeoutError:
+            print("Timed out")
             return []
 
     def __setResumeOnExit(self, breakpoint) -> None:
