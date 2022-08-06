@@ -12,6 +12,8 @@ import signal
 import enum
 
 from utils import Fuzz
+from gdb_harness import Gdb
+from pygdbmi.gdbcontroller import GdbController
 
 #BINARY RETURN CODES
 
@@ -110,6 +112,7 @@ class Harness():
         t.alive = True
         while t.alive == True and self.success == False:
             try:
+                # Note: GdbTesting ignores this. This, therefore, renders the fuzz function as unused.
                 fuzzInput = self.queue.get(timeout=0.2)
             except Empty:
                 pass
@@ -118,6 +121,10 @@ class Harness():
                     self.c_semaphore.acquire()
                     self.counter += 1
                     self.c_semaphore.release()
+
+                    # GDB Testing
+                    payload = Gdb(GdbController(), self.program, self.fuzzer, t).start()
+
                     subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
                     self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
@@ -126,68 +133,6 @@ class Harness():
                     self.success_semaphore.acquire()
                     self.success = True
                     self.crash_type = Error(e.returncode).name
-                    # if e.returncode == SIGHUP:
-                    #     self.crash_type = "SIGHUP"
-                    # elif e.returncode == SIGINT:
-                    #     self.crash_type = "SIGINT"
-                    # elif e.returncode == SIGQUIT:
-                    #     self.crash_type = "SIGQUIT"
-                    # elif e.returncode == SIGILL:
-                    #     self.crash_type = "SIGILL"
-                    # elif e.returncode == SIGTRAP:
-                    #     self.crash_type = "SIGTRAP"
-                    # elif e.returncode == SIGABRT:
-                    #     self.crash_type = "SIGABRT"
-                    # elif e.returncode == SIGBUS:
-                    #     self.crash_type = "SIGBUS"
-                    # elif e.returncode == SIGFPE:
-                    #     self.crash_type = "SIGFPE"
-                    # elif e.returncode == SIGKILL:
-                    #     self.crash_type = "SIGKILL"
-                    # elif e.returncode == SIGUSR1:
-                    #     self.crash_type = "SIGUSR1"
-                    # elif e.returncode == SIGSEGV:
-                    #     self.crash_type = "SIGSEGV"
-                    # elif e.returncode == SIGUSR2:
-                    #     self.crash_type = "SIGUSR2"
-                    # elif e.returncode == SIGPIPE:
-                    #     self.crash_type = "SIGPIPE"
-                    # elif e.returncode == SIGALRM:
-                    #     self.crash_type = "SIGALRM"
-                    # elif e.returncode == SIGTERM:
-                    #     self.crash_type = "SIGTERM"
-                    # elif e.returncode == SIGSTKFLT:
-                    #     self.crash_type = "SIGSTKFLT"
-                    # elif e.returncode == SIGCHLD:
-                    #     self.crash_type = "SIGCHLD"
-                    # elif e.returncode == SIGCONT:
-                    #     self.crash_type = "SIGCONT"
-                    # elif e.returncode == SIGSTOP:
-                    #     self.crash_type = "SIGSTOP"
-                    # elif e.returncode == SIGTSTP:
-                    #     self.crash_type = "SIGTSTP"
-                    # elif e.returncode == SIGTTIN:
-                    #     self.crash_type = "SIGTTIN"
-                    # elif e.returncode == SIGTTOU:
-                    #     self.crash_type = "SIGTTOU"
-                    # elif e.returncode == SIGURG:
-                    #     self.crash_type = "SIGURG"
-                    # elif e.returncode == SIGXCPU:
-                    #     self.crash_type = "SIGXCPU"
-                    # elif e.returncode == SIGXFSZ:
-                    #     self.crash_type = "SIGXFSZ"
-                    # elif e.returncode == SIGVTALRM:
-                    #     self.crash_type = "SIGVTALRM"
-                    # elif e.returncode == SIGPROF:
-                    #     self.crash_type = "SIGPROF"
-                    # elif e.returncode == SIGWINCH:
-                    #     self.crash_type = "SIGWINCH"
-                    # elif e.returncode == SIGIO:
-                    #     self.crash_type = "SIGIO"
-                    # elif e.returncode == SIGPWR:
-                    #     self.crash_type = "SIGPWR"
-                    # elif e.returncode == SIGSYS:
-                    #     self.crash_type = "SIGSYS"
                     self.success_semaphore.release() 
         sys.exit(0)
 
@@ -305,15 +250,12 @@ class Harness():
 
 
 if __name__ == '__main__':
-    # try:
-    #     inputs = [
-    #         'header,must,stay,intact',
-    #         '0,1,1,0'
-    #     ]
-    #     s = subprocess.run('tests/csv1', input='\n'.join(inputs), check=True, text=True)
-    #     print(s.returncode)
-    # except subprocess.CalledProcessError as e:
-    #     print(e.args, e.returncode)
-
-    e = -4
-    print(Error(e))
+    try:
+        inputs = [
+            'header,must,stay,intact',
+            '0,1,1,0'
+        ]
+        s = subprocess.run('tests/csv1', input='\n'.join(inputs), check=True, text=True)
+        print(s.returncode)
+    except subprocess.CalledProcessError as e:
+        print(e.args, e.returncode)
