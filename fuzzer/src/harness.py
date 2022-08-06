@@ -59,7 +59,7 @@ class Harness():
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
-        self.TESTERS = 20
+        self.TESTERS = 30
         self.FUZZERS = 1
         self.LOGFILE = open('log.out', 'w')
 
@@ -194,9 +194,8 @@ class Harness():
 
     def monitor(self, refresh_time=2) -> None:
         self.start()
-
         # Set defaults
-        curr_count = self.counter
+        curr_count = self.counter - self.queue.qsize() #SB updates to subtract self.queue.qsize()
         prev_count = 0
         start_time = time.time()
         curr_time = start_time
@@ -204,6 +203,7 @@ class Harness():
         curr_rate = 0
         total_rate = 0
         total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
+        slow_interval = 0
 
         # Start monitoring loop
         try:
@@ -233,14 +233,21 @@ class Harness():
 
                     # Update variables
                     curr_time = time.time()
-                    curr_count = self.counter - self.QUEUE_SIZE
+                    curr_count = self.counter - self.queue.qsize()
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
+                    if curr_rate == 0 and slow_interval < 10:
+                        slow_interval += 1
+                    elif curr_rate > 0 and slow_interval > 0:
+                        slow_interval -= 1
 
                     print(table_format.format("", *table.keys())) # Prints the headers
                     print(table_format.format("", *table.values())) # Prints the values
                     print("Press Ctrl + C to exit.")
+                    if slow_interval > 5:
+                        print("The fuzzer seems to stuck. Consider restarting.")
+
 
                 elif self.success == True:
                     print(f"Success! Crash type: {self.crash_type}")
