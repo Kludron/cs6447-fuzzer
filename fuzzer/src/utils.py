@@ -1,13 +1,15 @@
 # Utilities for COMP6447 Fuzzer
+from ctypes import sizeof
 import random
 import string
 import sys
 import json
+import math
 from tkinter import E
 import xml.etree.ElementTree as ElementTree
 # from pwn import *
 import copy
-from random import choice, randint
+from random import choice, randint, uniform
 
 TYPE_FAIL = -1
 TYPE_CSV = 0
@@ -15,6 +17,8 @@ TYPE_JSON = 1
 TYPE_JPG = 2
 TYPE_XML = 3
 TYPE_PLAINTEXT = 4
+
+BYTE_MASK = 0xff
 
 # Generic Fuzzer Class
 class Fuzz():
@@ -27,6 +31,10 @@ class Fuzz():
     def fuzz(self):
         # The below is just a placeholder for testing purposes
         return ''.join(random.choice(string.ascii_lowercase) for _ in range(8))
+    # if harness detects grater code coverage from a mutation, update the seed
+    # this could potentially speed up the fuzzing process by order of magnitude
+    def updateSeed(self, new):
+        self.seed = new;
     
     
     '''
@@ -43,17 +51,38 @@ class Fuzz():
         return ''.join(random.choices(string.printable, k=randint(1, 20)))
     
     
+    
     '''
         Random String mutators
     '''
     def flipRandomBit(self, s):
         if s == '':
             return s
+        flip_array = [1,2,4,8,16,32,64,128] # possible bit masks
         idx = randint(0, len(s) - 1)
         c = s[idx]
-        mask = 1 << randint(0,6)    # select random bit position to flip
+        mask = random.choice(flip_array)
         flipped = chr(ord(c) ^ mask)    # xor the random character and bitmask
         return s[:idx] + flipped + s[idx + 1:]
+    def flipRatioBits(self, s, ratio): 
+        # flips a ratio of bits. Bits which have been flipped will not be flipped again
+        # ratio = (0, 1]. ratio = 0.1 --> flip 10% of bits
+        if s == '':
+            return s
+        mutation = s
+        number_of_flips = len(s) * ratio
+        flip_array = [1,2,4,8,16,32,64,128] # possible bit masks
+        flips = []
+        while len(flips) < number_of_flips:
+            idx = randint(0, len(s) - 1)
+            mask = random.choice(flip_array)
+            flip = (idx, mask)
+            if flip in flips:
+                continue
+            else:
+                flips.append(flips)
+                mutation[idx] = mutation[idx]^mask
+        return mutation
     def deleteRandomChar(self, s):
         if s == '':
             return s
@@ -62,11 +91,78 @@ class Fuzz():
     def insertRandomChar(self, s):
         idx = randint(0, len(s))
         return s[:idx] + chr(randint(0, 127)) + s[idx:]
+
+       
     
-    # take a bytearray and flip random bytes
-    def bytes_bit_flip(self, data):
+    '''
+        Byte object mutator. Given byte array, flip bits in a random byte
+        Bit flipping is insignificant compared to byte flipping when it comes to discovering new execution paths, 
+        so don't bother implementing some byte-flipping techniques for bit-flipping
+    '''
+    # given a bytearray, flip a random bit in a random byte
+    # just realised that this is pretty much the same as string bit flip
+    def flipRandomBitInByte(self, data):
+        if data == '':
+            return data
+        flip_array = [1,2,4,8,16,32,64,128]
+        idx = randint(0, len(data) - 1)
+        mask = random.choice(flip_array)
+        data[idx] = data[idx] ^ mask
+        return data
+    '''
+        Normally used as a last resort.
+        Given two input sets that differ in at least two locations, 
+        splice them at a random location in the middle
+        theoretically, higher variance between data samples should result in greater likelihood of execution path discovery
+    '''
+    def testCaseSplicing(self, data1, data2):
+        mid1 = len(data1 - 1)
+        mid2 = len(data2 - 1)
+        idx1 = mid1 + math.round(randint(0, mid1)*uniform(-0.35, 0.35))    # try to pick a random position about the midpt
+        idx2 = mid2 + math.round(randint(0, mid2)*uniform(-0.35, 0.35))
+        return data1[:idx1] + data2[idx2:]
+    def flipRandomByte(self, data):
+        if len(data) == 0:
+            return data
+        mutation = data
+        idx = randint(0, len(data))
+        mutation[idx] = mutation[idx] ^ BYTE_MASK
+        return mutation
+    def flipRatioBytes(self, data, ratio):
+        if len(data) == 0:
+            return data
+        mutation = data
+        number_of_flips = len(data) * ratio
+        flips = []
+        while sizeof(flips) < number_of_flips:
+            idx = randint(0, len(data) - 1)
+            if idx in flips:
+                continue
+            else:
+                flips.append(idx)
+                mutation[idx] = mutation[idx] ^ BYTE_MASK
+        return mutation
+    def flipConsecutiveBytes(self, data, length):
+        if len(data) == 0:
+            return data
+        mutation = data
+        idx = randint(0, len(data) - length)    # ensures that [length] consecutive bytes WILL be flipped
+        while idx < idx + length:
+            mutation[idx] = mutation[idx] ^ BYTE_MASK
+            idx += 1
+        return mutation
+    
+    
+    
+    
+    
+    '''
+        JPG mutator. got some readings on it so might as well implement it
+    '''
+    def flipRatioBitsJPG(self, data, ratio):
+        #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         length = len(data) - 4
-        num_of_flips = int(length * .01)
+        num_of_flips = int(length * ratio)
         indexes = []
         flip_array = [1,2,4,8,16,32,64,128]
         counter = 0
@@ -76,9 +172,18 @@ class Fuzz():
         for x in indexes:
             mask = random.choice(flip_array)
             data[x] = data[x] ^ mask
-
         return data
-        
+
+
+
+
+
+
+
+
+
+
+
 
 class CSV_Fuzz(Fuzz):
     
