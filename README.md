@@ -4,9 +4,9 @@ Project Spec: https://webcms3.cse.unsw.edu.au/COMP6447/22T2/resources/75130
 
 Google Docs (Report Documentation): 
 
-(Midterm Report)[https://docs.google.com/document/d/1dvWuJvmvnArauf43ZDLuO7kDrXm9PjhW4JgYlKKciDs/edit?usp=sharing]
+[Midterm Report](https://docs.google.com/document/d/1dvWuJvmvnArauf43ZDLuO7kDrXm9PjhW4JgYlKKciDs/edit?usp=sharing)
 
-(Final Report) [https://docs.google.com/document/d/1MyWc96-o0q8fuBDCFl_NAeyxPlJ0eCIVOhi8xBs3S7Q/edit?usp=sharing]
+[Final Report](https://docs.google.com/document/d/1MyWc96-o0q8fuBDCFl_NAeyxPlJ0eCIVOhi8xBs3S7Q/edit?usp=sharing)
 
 Binaries Download: https://cloudstor.aarnet.edu.au/plus/s/QnDputxJslGQok8
 
