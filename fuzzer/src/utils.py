@@ -495,9 +495,25 @@ class Plaintext_Fuzz(Fuzz):
 class JPG_Fuzz(Fuzz):
     def __init__(self, seed):
         super().__init__(seed)
+        print("created jpg fuzzer")
     # I'm guessing we need to use bit flipping for this one
-    def mutate():
-        pass
+    def mutate(self):
+        strategy = randint(0, 100)
+        if strategy < 20:
+            mutation = self.mutate_magic(self.seed)
+        elif strategy < 30:
+            ratio = uniform(0.00001, 0.001)
+            mutation = self.flipRatioBits(self.seed, ratio)
+        elif strategy <  65:
+            mutation = self.flipRandomBit(self.seed)
+        elif strategy < 98:
+            mutation = self.flipRandomByte(self.seed)
+        elif strategy <= 100:
+             # this method has higher probability of corrupting the jpg file format, we don't want to use it too often
+            ratio = uniform(0.00001, 0.0001)
+            mutation = self.flipRatioBytes(self.seed, ratio)
+        return mutation
+        # return self.seed
     
     # replace with magic byte
     def mutate_magic(self, data):
@@ -517,26 +533,93 @@ class JPG_Fuzz(Fuzz):
         length = len(data) - 8  # make sure we dont write over the EOI marker
         idx = randint(0, length)
         n_size, n = choice(values)
-        data[idx:idx + n_size] = bytearray(n)
-        
+        print("magic mutate: ", idx, hex(n), n_size)
+        # data[idx:idx + n_size] = bytearray(n)
+        # return data
+        if n_size == 1:
+            if n == 0xff:			# 0xFF
+                data[idx] = 0xff
+            elif n == 0x7f:		# 0x7F
+                data[idx] = 0x7f
+            elif n == 0:			# 0x00
+                data[idx] = 0
+        elif n_size == 2:
+            if n == 0xffff:			# 0xFFFF
+                data[idx] = 0xff
+                data[idx + 1] = 0xff
+            elif n == 0:			# 0x0000
+                data[idx] = 0
+                data[idx + 1] = 0
+        elif n_size == 4:
+            if n == 0xFFFFFFFF:			# 0xFFFFFFFF
+                data[idx] = 0xff
+                data[idx + 1] = 0xff
+                data[idx + 2] = 0xff
+                data[idx + 3] = 0xff
+            elif n == 0:			# 0x00000000
+                data[idx] = 0
+                data[idx + 1] = 0
+                data[idx + 2] = 0
+                data[idx + 3] = 0
+            elif n == 0x80000000:		# 0x80000000
+                data[idx] = 0x80
+                data[idx + 1] = 0
+                data[idx + 2] = 0
+                data[idx + 3] = 0
+            elif n == 0x40000000:			# 0x40000000
+                data[idx] = 0x40
+                data[idx + 1] = 0
+                data[idx + 2] = 0
+                data[idx + 3] = 0
+            elif n == 0x7FFFFFFF:		# 0x7FFFFFFF
+                data[idx] = 0x7f
+                data[idx + 1] = 0xff
+                data[idx + 2] = 0xff
+                data[idx + 3] = 0xff
+        return data
+      
     # randomly flip a proportion of bits
-    def flipRatioBitsJPG(self, data, ratio):
+    def flipRatioBits(self, data, ratio):
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         num_of_flips = int(length * ratio)
+        print("flip bits ratio: ", ratio, num_of_flips)
         indexes = []
         flip_array = [1,2,4,8,16,32,64,128]
-        counter = 0
-        while counter < num_of_flips:
-            indexes.append(random.choice(range(0,length)))
-            counter += 1
+        while len(indexes) < num_of_flips:
+            indexes.append(randint(0, length))
         for x in indexes:
             mask = random.choice(flip_array)
             data[x] = data[x] ^ mask
         return data
     
+    def flipRandomBit(self, data):
+        print("flip single bit")
+        length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
+        idx = randint(0, length)
+        flip_array = [1,2,4,8,16,32,64,128]
+        mask = random.choice(flip_array)
+        data[idx] = data[idx] ^ mask
+        return data
+    def flipRandomByte(self, data):
+        print("flip single byte")
+        length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
+        idx = randint(0, length)
+        data[idx] = data[idx] ^ 0xff
+        return data
+    def flipRatioBytes(self, data, ratio):
+        length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
+        num_of_flips = int(length * ratio)
+        print("flip ratio bytes", ratio*100, num_of_flips)
+        indexes = set()
+        while len(indexes) < num_of_flips:
+            indexes.add(randint(0, length))
+        for idx in indexes:
+            data[idx] = data[idx] ^ 0xff
+        return data
+            
+        
     def fuzz(self):
-        # Placeholder
-        return super().fuzz()
+        return self.mutate()
 
 '''
     returns (fileType, seed)
@@ -588,12 +671,17 @@ def getType(filename) -> Fuzz or None:
         # Plaintext_Fuzz.fuzz(inputTxt)
     elif type == TYPE_JPG:
         print("getType() - Detected JPG")
-        JPG_Fuzz(inputTxt)
+        fuzzer = JPG_Fuzz(inputTxt)
     return fuzzer
 
 if __name__ == '__main__':
     fuzzer = getType(sys.argv[1])
+    mutation = fuzzer.mutate()
+    # print(mutation)
     
+    f = open("tests/mutated.txt", "wb+")
+    f.write(mutation)
+    f.close()
     
     # for i in range(10):
     #     print(fuzzer.generateOverflowedInt())
