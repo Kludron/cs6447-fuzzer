@@ -82,6 +82,7 @@ class Harness():
         self.outfile = open('bad.txt', 'w')
 
         self.useGDB = useGDB
+        
 
 
     def start(self) -> None:
@@ -103,6 +104,9 @@ class Harness():
             for _ in range(self.TESTERS):
                 thread = Thread(target=self.test, daemon=True)        
                 thread.start()
+                if self.useGDB:
+                    self.gdb = Gdb(GdbController(), self.program, self.queue, thread)
+                    self.gdb.setup()
 
             # Create and start fuzzer threads
             for _ in range(self.FUZZERS):
@@ -125,9 +129,7 @@ class Harness():
                 try:
                     if self.useGDB:
                         # GDB Testing
-                        gdb = GdbController()
-                        payload = Gdb(gdb, self.program, self.queue, t).start()
-                        gdb.exit()
+                        payload = self.gdb.start()
                         if payload:
                             try:
                                 self.c_semaphore.acquire()

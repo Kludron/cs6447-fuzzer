@@ -71,13 +71,13 @@ class CSV_Fuzz(Fuzz):
             yield '\n'.join([randString for _ in range(i)])
 
     def __generate(self):
-        for i in self.__generate_lines():
-            self.mutations.append(i)
         for i in self.__generate_long():
             self.mutations.append(i)
         for i in self.__generate_random():
             self.mutations.append(i)
         for i in self.__generate_lots():
+            self.mutations.append(i)
+        for i in self.__generate_lines():
             self.mutations.append(i)
 
     def checkType(self):
