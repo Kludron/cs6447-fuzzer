@@ -51,7 +51,7 @@ if __name__ == '__main__':
     else:
         view = True
         useGDB = True
-        if 'ViewOFF' in sys.argv: 
+        if 'ViewOFF' in sys.argv:
             view=False
             print("Using without monitor")
         if 'GdbOFF' in sys.argv:
