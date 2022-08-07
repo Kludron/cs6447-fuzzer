@@ -59,8 +59,8 @@ class Harness():
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
-        self.TESTERS = 20
-        self.FUZZERS = 1
+        self.TESTERS = 40
+        self.FUZZERS = 2
         self.LOGFILE = open('log.out', 'w')
 
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
@@ -77,6 +77,9 @@ class Harness():
         self.success = False
         self.crash_type = None
         self.success_semaphore = Semaphore()
+
+        self.code_paths = list()
+        self.code_paths_semaphore = Semaphore()
 
         self.out_semaphore = Semaphore()
         self.outfile = open('bad.txt', 'w')
@@ -128,7 +131,7 @@ class Harness():
                     if self.useGDB:
                         # GDB Testing
                         gdb = GdbController()
-                        payload = Gdb(gdb, self.program, self.queue, t).start()
+                        payload = Gdb(gdb, self.program, self.queue, t, self.code_paths, self.code_paths_semaphore).start()
                         gdb.exit()
                         if payload:
                             try:
@@ -136,6 +139,7 @@ class Harness():
                                 self.gdbDetections += 1
                                 self.c_semaphore.release()
                                 # Verify the payload with recreation
+                                #print(payload) 
                                 fuzzInput, signal = payload
                                 subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
                                 #, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -215,29 +219,52 @@ class Harness():
         total_rate = 0
         total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
         slow_interval = 0
+        paths = 0
+        code_coverage = 0
+        prev_coverage = 0
+        coverage_interval = 0
 
         # Start monitoring loop
         try:
+            time.sleep(2)
             start = time.time()
-            # while time.time() < start + 3*60:
-            while True:
+            while time.time() < start + 3*60:
+            #while True:
                 if prev_time != 0 and self.success == False:
 
                     # Create the table
-
-                    table = {
+                    '''
+                    table1 = {
                         "Binary Name":self.program,
                         "Run Time":total_time,
                         "Total Tests":curr_count,
-                        "Queue Length":self.queue.qsize(),
-                        "Current Rate":curr_rate,
-                        "Overall Rate":total_rate,
+                        "Cur Tests\Sec":curr_rate,
+                        "Total Tests\Sec":total_rate,
                         "Total Crashes":self.crashes,
-                        "GDB Detections":self.gdbDetections,
+                        "GDB Detect":self.gdbDetections,
                         "Using GDB":self.useGDB,
+                        "Code Paths":paths,
+                        "Code Coverage":code_coverage,
+                    }
+                    '''
+                    table1 = {
+                        "Binary Name":self.program,
+                        "Run Time":total_time,
+                        "Total Tests":curr_count,
+                        "Current tests\sec":curr_rate,
+                        "Total tests\sec":total_rate,
+                        "Queue Length":self.queue.qsize(),
+                    }
+                    table2 = {
+                        "Total Crashes":self.crashes,
+                        "GDB Detect":self.gdbDetections,
+                        "Using GDB":self.useGDB,
+                        "Code Paths":paths,
+                        "Code Coverage":code_coverage,
                     }
                     
-                    table_format = "{:<15}" * (len(table.keys()) + 1)
+                    table_format1 = "{:<20}" * (len(table1.keys()) + 1)
+                    table_format2 = "{:<20}" * (len(table2.keys()) + 1)
 
                     # Print output
                     if sys.platform == 'linux' or sys.platform == 'darwin':
@@ -251,26 +278,41 @@ class Harness():
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
+                    if len(self.code_paths) > 2:
+                        paths = len(self.code_paths) - 1
+                        code_coverage = paths/self.code_paths[0]
                     if curr_rate == 0 and slow_interval < 10:
                         slow_interval += 1
                     elif curr_rate > 0 and slow_interval > 0:
                         slow_interval -= 1
+                    if prev_coverage == code_coverage:
+                        coverage_interval += 1
+                    elif prev_coverage < code_coverage:
+                        coverage_interval = 0
 
-                    print(table_format.format("", *table.keys())) # Prints the headers
-                    print(table_format.format("", *table.values())) # Prints the values
+                    print(table_format1.format("", *table1.keys())) # Prints the headers
+                    print(table_format1.format("", *table1.values())) # Prints the values
+                    print()
+                    print(table_format2.format("", *table2.keys())) # Prints the headers
+                    print(table_format2.format("", *table2.values())) # Prints the values
+                    print()
                     print("Press Ctrl + C to exit.")
                     if slow_interval > 5:
                         print("The fuzzer seems to stuck. Consider restarting.")
-
+                    else:
+                        print()
+                    if coverage_interval > 30:
+                        print("Code coverage has is no longer increasing. Possible infinite loop.")
 
                 elif self.success == True:
                     print(f"Success! Crash type: {self.crash_type}")
                     self.finish()
                     print('Output saved to bad.txt')  
-                    return
+                    return                    
 
                 prev_time = curr_time
                 prev_count = curr_count
+                prev_coverage = code_coverage
                 time.sleep(refresh_time)
 
         except KeyboardInterrupt: # Ctrl + C
