@@ -51,6 +51,95 @@ class Fuzz():
         return ''.join(random.choices(string.printable, k=randint(1, 20)))
     
     
+    '''
+        Arithmetic operations
+        Theoretically does not discover significant number of execution paths.
+        Probability of calling them should decrease as fuzzer runs.
+    '''
+    def negative(self, data):
+        return -data    
+    def increment(self, data):
+        return data + 1
+    def decrement(self, data):
+        return data - 1
+    def addInt(self, data):
+        return data + 1234
+    def minusInt(self, data):
+        return data - 1234
+    def addFloat(self, data):
+        return data + uniform(0, 1000)
+    def minusFloat(self, data):
+        return data - uniform(0, 1000)
+    
+    
+    '''
+        Known Ints
+    '''
+    def zero(self):
+        return 0
+    def knownNeg(self):
+        return -1
+    def knownLargePosInt(self):
+        return 999999
+    def knownLargeNegInt(self):
+        return -999999
+    def knownPosFloat(self):
+        return 1.5
+    def knownNegFloat(self):
+        return -1.5
+    def intOverflow(self):
+        return 9999999999999999999
+    def intUnderflow(self):
+        return -9999999999999999999
+    def intMax(self):
+        return 0x7FFFFFFF
+    def intMin(self):
+        return 0x80000000
+    
+    
+    '''
+        Magic bytes which often cause errors
+    '''
+    def mutate_magic(self, data):
+        # tuple = (byte-size of value, value)
+        values = [
+            (1, 0xff),
+            (1, 0x7f),
+            (1, 0),
+            (2, 0xffff),
+            (2, 0),
+            (4, 0xffffffff),
+            (4, 0),
+            (4, 0x80000000),
+            (4, 0x40000000),
+	        (4, 0x7fffffff)
+        ]
+        length = len(data) - 8  # make sure we dont write over the EOI marker
+        idx = randint(0, length)
+        n_size, n = choice(values)
+        data[idx:idx + n_size] = bytearray(n)
+        
+
+    
+    
+    
+    
+    '''
+        Boolean
+    '''
+    def setTrue(self):
+        return True
+    def setFalse(self):
+        return False
+    def flipBool(self, val):
+        return not val
+    
+    '''
+        Null
+    '''
+    def setNull(self):
+        return None
+    
     
     '''
         Random String mutators
@@ -156,23 +245,6 @@ class Fuzz():
     
     
     
-    '''
-        JPG mutator. got some readings on it so might as well implement it
-    '''
-    def flipRatioBitsJPG(self, data, ratio):
-        #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
-        length = len(data) - 4
-        num_of_flips = int(length * ratio)
-        indexes = []
-        flip_array = [1,2,4,8,16,32,64,128]
-        counter = 0
-        while counter < num_of_flips:
-            indexes.append(random.choice(range(0,length)))
-            counter += 1
-        for x in indexes:
-            mask = random.choice(flip_array)
-            data[x] = data[x] ^ mask
-        return data
 
 
 
@@ -421,16 +493,55 @@ class Plaintext_Fuzz(Fuzz):
 
 # JPG Fuzzer. No need to overwrite checkType()
 class JPG_Fuzz(Fuzz):
-    def __init__(self, seed):  
+    def __init__(self, seed):
         super().__init__(seed)
     # I'm guessing we need to use bit flipping for this one
     def mutate():
         pass
+    
+    # replace with magic byte
+    def mutate_magic(self, data):
+        # tuple = (byte-size of value, value)
+        values = [
+            (1, 0xff),
+            (1, 0x7f),
+            (1, 0),
+            (2, 0xffff),
+            (2, 0),
+            (4, 0xffffffff),
+            (4, 0),
+            (4, 0x80000000),
+            (4, 0x40000000),
+            (4, 0x7fffffff)
+        ]
+        length = len(data) - 8  # make sure we dont write over the EOI marker
+        idx = randint(0, length)
+        n_size, n = choice(values)
+        data[idx:idx + n_size] = bytearray(n)
+        
+    # randomly flip a proportion of bits
+    def flipRatioBitsJPG(self, data, ratio):
+        length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
+        num_of_flips = int(length * ratio)
+        indexes = []
+        flip_array = [1,2,4,8,16,32,64,128]
+        counter = 0
+        while counter < num_of_flips:
+            indexes.append(random.choice(range(0,length)))
+            counter += 1
+        for x in indexes:
+            mask = random.choice(flip_array)
+            data[x] = data[x] ^ mask
+        return data
+    
     def fuzz(self):
         # Placeholder
         return super().fuzz()
-        
 
+'''
+    returns (fileType, seed)
+    jpg type requires reading the file as a bytearray
+'''
 def checkType(filename):
     try:
         with open(filename, 'r') as fp:
@@ -447,10 +558,14 @@ def checkType(filename):
     except IOError:
         return TYPE_FAIL, ''
     except:
-        return TYPE_JPG, inputTxt
+        f = open(filename, "rb").read()
+        fileBytes = bytearray(f)
+        return TYPE_JPG, fileBytes
 
 
-# From seed file, detect type and return type-specific fuzzer object
+'''
+    From seed file, detect type and return type-specific fuzzer object
+'''
 def getType(filename) -> Fuzz or None:    
     print("getType() - seed: ", filename)
     
@@ -467,24 +582,23 @@ def getType(filename) -> Fuzz or None:
         fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
         print("getType() - Detected XML")
-        XML_Fuzz.fuzz(inputTxt)
+        # XML_Fuzz.fuzz(inputTxt)
     elif type == TYPE_PLAINTEXT:
         print("getType() - Detected Plaintext")
-        Plaintext_Fuzz.fuzz(inputTxt)
+        # Plaintext_Fuzz.fuzz(inputTxt)
     elif type == TYPE_JPG:
         print("getType() - Detected JPG")
-        JPG_Fuzz.fuzz(inputTxt)
+        JPG_Fuzz(inputTxt)
     return fuzzer
 
 if __name__ == '__main__':
     fuzzer = getType(sys.argv[1])
     
     
-    
-    for i in range(10):
-        # print(fuzzer.generateOverflowedInt())
-        print(fuzzer.generateString())
-        # print(fuzzer.fuzz())
+    # for i in range(10):
+    #     print(fuzzer.generateOverflowedInt())
+    #     print(fuzzer.generateString())
+    # print(fuzzer.fuzz())
             
     
     # if type == TYPE_FAIL:

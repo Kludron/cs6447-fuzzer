@@ -1,2 +1,4 @@
-fuzzer/src/bad.txt
-fuzzer/src/log.out
+__pycache__/
+bad.txt
+testJson.txt
+testBad.txt
