@@ -29,15 +29,17 @@ def print_type(file):
         
 
 # getType returns the data from the seed file. Update functions to read the data passed through, rather than the seed file to save from re-opening the seed file.
-def run(program, seed):
+def run(program, seed, view=True, useGDB=True):
     print_type(seed)
     fuzzer = getType(seed)
     if fuzzer:
-        harness = Harness(program, seed, fuzzer)
-        harness.monitor()
-        #harness.start()
-        while True:
-            pass
+        harness = Harness(program, seed, fuzzer, useGDB=useGDB)
+        if view:
+            harness.monitor()
+        else:
+            harness.start()
+            while True:
+                pass
     else:
         print('Failed to open or detect seed type.')
 
@@ -47,4 +49,14 @@ if __name__ == '__main__':
         usage = f"{sys.argv[0]} <binary file> <seed file>"
         print(usage)
     else:
-        run(sys.argv[1], sys.argv[2])
+        view = True
+        useGDB = True
+        if 'ViewOFF' in sys.argv: 
+            view=False
+            print("Using without monitor")
+        if 'GdbOFF' in sys.argv:
+            useGDB=False
+            print("Using without GDB integration")
+        
+        run(sys.argv[1], sys.argv[2], view=view, useGDB=useGDB)
+

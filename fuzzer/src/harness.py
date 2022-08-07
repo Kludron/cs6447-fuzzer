@@ -52,19 +52,20 @@ class Error(enum.Enum):
 
 class Harness():
 
-    def __init__(self, program: str, seed: str, fuzzer: Fuzz) -> None:
+    def __init__(self, program: str, seed: str, fuzzer: Fuzz, useGDB:bool=True) -> None:
         self.program = program
         self.seed = seed
         self.fuzzer = fuzzer
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
-        self.TESTERS = 30
+        self.TESTERS = 20
         self.FUZZERS = 1
         self.LOGFILE = open('log.out', 'w')
 
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
         self.counter = 0
+        self.gdbDetections = 0
         self.c_semaphore = Semaphore()
 
         self.crashes = 0
@@ -78,7 +79,9 @@ class Harness():
         self.success_semaphore = Semaphore()
 
         self.out_semaphore = Semaphore()
-        self.outfile = open('bad.txt', 'a')
+        self.outfile = open('bad.txt', 'w')
+
+        self.useGDB = useGDB
 
 
     def start(self) -> None:
@@ -113,36 +116,42 @@ class Harness():
         while t.alive == True and self.success == False:
             try:
                 # Note: GdbTesting ignores this. This, therefore, renders the fuzz function as unused.
-                # fuzzInput = self.queue.get(timeout=0.2)
-                fuzzInput = "header,must,stay,intact"
+                fuzzInput = self.queue.get(timeout=0.2)
+                # fuzzInput = "header,must,stay,intact"
                 pass
             except Empty:
                 pass
             else:
                 try:
-                    # self.c_semaphore.acquire()
-                    # self.counter += 1
-                    # self.c_semaphore.release()
+                    if self.useGDB:
+                        # GDB Testing
+                        gdb = GdbController()
+                        payload = Gdb(gdb, self.program, self.queue, t).start()
+                        gdb.exit()
+                        if payload:
+                            try:
+                                self.c_semaphore.acquire()
+                                self.gdbDetections += 1
+                                self.c_semaphore.release()
+                                # Verify the payload with recreation
+                                fuzzInput, signal = payload
+                                subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                                #, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)
+                                self.LOGFILE.write(fuzzInput+'\n...\n')
+                            except (ValueError):
+                                pass
+                    else:
+                        subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                        self.LOGFILE.write(fuzzInput+'\n...\n')
 
-                    # GDB Testing
-                    payload = Gdb(GdbController(), self.program, self.queue, t).start()
-                    if payload:
-                        try:
-                            string, signal = payload
-                            fuzzInput = string
-                            raise subprocess.CalledProcessError(signal, fuzzInput)
-                        except (ValueError):
-                            raise subprocess.CalledProcessError(Error.SIGKILL, "cmd")
 
-                    # subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN))
-                    # self.LOGFILE.write(fuzzInput+'\n...\n')
                 except subprocess.CalledProcessError as e:
                     self.out_semaphore.acquire()
                     self.outfile.write(fuzzInput + '\n')
                     self.success_semaphore.acquire()
                     self.success = True
-                    # self.crash_type = Error(e.returncode).name
-                    self.crash_type = e.returncode
+                    self.crash_type = Error(e.returncode).name
+                    # self.crash_type = e.returncode
                     self.success_semaphore.release() 
         sys.exit(0)
 
@@ -192,7 +201,7 @@ class Harness():
         self.outfile.close()
 
 
-    def monitor(self, refresh_time=2) -> None:
+    def monitor(self, refresh_time=1) -> None:
         self.start()
         # Set defaults
         curr_count = self.counter - self.queue.qsize() #SB updates to subtract self.queue.qsize()
@@ -208,7 +217,8 @@ class Harness():
         # Start monitoring loop
         try:
             start = time.time()
-            while time.time() < start + 190:
+            # while time.time() < start + 3*60:
+            while True:
                 if prev_time != 0 and self.success == False:
 
                     # Create the table
@@ -221,6 +231,8 @@ class Harness():
                         "Current Rate":curr_rate,
                         "Overall Rate":total_rate,
                         "Total Crashes":self.crashes,
+                        "GDB Detections":self.gdbDetections,
+                        "Using GDB":self.useGDB,
                     }
                     
                     table_format = "{:<15}" * (len(table.keys()) + 1)

@@ -36,117 +36,6 @@ class Gdb():
 
         self.counter = 0    #SB added counter and semaphore to test known bad text
         self.c_semaphore = Semaphore()
-        self.BAD = """header,must,stay,intact
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D
-o,Q,l,D"""
 
         if not os.path.isfile(binary):
             raise FileNotFoundError
@@ -164,7 +53,8 @@ o,Q,l,D"""
         # Set persistent breakpoints at input functions
         if len(input_funcs) < 1:
             # Binary does not have any input functions
-            raise Exception("Could not detect any input functions")
+            # raise Exception("Could not detect any input functions")
+            print("Could not detect any input functions")
         else:
             self.input_bpoints = self.__makeBreakpoints(input_funcs, self.input_bpoints, bktype='tbreak') #SB Update to tbreak
         #pprint(self.input_bpoints)
@@ -329,10 +219,10 @@ o,Q,l,D"""
                 self.c_semaphore.acquire()      #SB this temporarily to test with known bad text
                 self.counter += 1
                 self.c_semaphore.release()
-                if self.counter == 20:
-                    response = self.__write(self.BAD)
-                else:
-                    response = self.__write(f'{payload}')
+                # if self.counter == 20:
+                #     response = self.__write(self.BAD)
+                # else:
+                #     response = self.__write(f'{payload}')
                 
                 #response = self.__write(f'{payload}')
                 #pprint(f'{self.thread}:{response}')
