@@ -221,11 +221,11 @@ class Harness():
         if self.useGDB == 1:
             code_coverage = 0
             paths = 0
-            gdbusage = 'Yes'
+            mode = 'GDB'
         else:
             code_coverage = 'N/A'
             paths = 'N/A'
-            gdbusage = 'No'
+            mode = 'Native'
         prev_coverage = 0
         coverage_interval = 0
         threads = len(enumerate()) - self.FUZZERS - 1
@@ -252,7 +252,7 @@ class Harness():
                     table2 = {
                         "Total Crashes":self.crashes,
                         "GDB Detect":self.gdbDetections,
-                        "Using GDB":gdbusage,
+                        "Harnes Mode":mode,
                         "Code Paths":paths,
                         "Code Coverage":code_coverage,
                         "Thread Number":threads,
