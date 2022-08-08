@@ -7,6 +7,7 @@ from pygdbmi.constants import GdbTimeoutError
 from queue import Queue
 from threading import Semaphore
 from pprint import pprint
+from pwn import *
 
 import time
 import hashlib
@@ -72,7 +73,9 @@ class Gdb():
 
         # Set the default payload
         payload = ""
-        while self.thread.alive:            
+        while self.thread.alive:
+            #print("-------------------------------------")       #TODO delete
+            #print(response)       #TODO delete
             if response:
                 try:
                     recopy = response
@@ -81,6 +84,7 @@ class Gdb():
                 except (TypeError, KeyError, IndexError) as e:
                     break
             else:
+                #print("empty response")       #TODO delete
                 response = self.__write('continue') 
                 continue            
             # Check if persistent breakpoint is hit, or program has exited
@@ -94,13 +98,20 @@ class Gdb():
                 if reason == 'breakpoint-hit': 
                     cpID = time.time()
                     bpID = response["payload"]["bkptno"]
+                    #print(f'bp address: {response["payload"]["frame"]["addr"]}') #TODO delete
+                    #response = self.gdb.write(f'info breakpoints') #TODO delete
+                    #print(response) #TODO delete
                     #If breakpoint was an input function delete the breakpoint and create a checkpoint
                     try:
                         if response["payload"]["frame"]["addr"] in self.input_bpoints:
                             #Delete breakpoint at input function and replace with checkpoint
                             self.gdb.write(f'delete breakpoints {bpID}') 
                             # Create a checkpoint at this input function
+                            #response = self.gdb.write(f'info checkpoints') #TODO delete
+                            #print(response) #TODO delete
                             self.__checkpointCreate(bpID)
+                            #response = self.gdb.write(f'info checkpoints') #TODO delete
+                            #print(response) #TODO delete
                             response = self.__write('continue')
                         else:
                             #Only other type of permantent function is on exit, restore checkpoint if hit
@@ -109,7 +120,8 @@ class Gdb():
                         pass
                     finally:
                         #Perform backtrace to save path for code coverage
-                        response = self.gdb.write(f'backtrace {bpID}')
+                        #print("breakpoint-hit backtrace") #TODO delete
+                        response = self.gdb.write(f'backtrace')
                 
                 # Check if the program exited normally
                 elif reason == 'exited-normally':
@@ -131,9 +143,10 @@ class Gdb():
                         break
             # Check if temporary breakpoint at function was hit
             elif message == 'breakpoint-deleted':
-                cpID = time.time()
                 #Peformate backtrace to collect code path
-                response = self.gdb.write(f'backtrace {cpID}')
+                #print("breakpoint-deleted backtrace") #TODO delete
+                response = self.gdb.write(f'backtrace')
+                #print(response) #TODO delete
             # Check if previous execute command is completed and returning  
             elif message == 'done':
                 try:
@@ -146,8 +159,11 @@ class Gdb():
 
             # Check if the program is waiting for input
             elif message == 'running':
+                #print("running: entering payload") #TODO delete
                 payload = self.queue.get(timeout=0.2)
+                #print(f"payload: {payload}") #TODO delete
                 response = self.__write(f'{payload}')
+                gdb.Gdb
             #Check if permanent breakpoint was hit
             elif message == 'breakpoint-modified':
                 response = self.__write('continue')
@@ -201,7 +217,7 @@ class Gdb():
         description:
             Checks if the line contains any input function attributes
         """
-        input_attributes = ['fgets', 'gets', 'scanf']
+        input_attributes = ['fgets', 'gets', 'scanf', 'fread']
         if any(attr in line for attr in input_attributes):
             return True
         return False
@@ -258,6 +274,7 @@ class Gdb():
     ###################
 
     def __write(self, content:str) -> list:
+        #print("__write") #TODO delete
         """
         params:
             :content: The string to send to self.gdb.write()
@@ -267,12 +284,13 @@ class Gdb():
         try:
             return self.gdb.write(content, timeout_sec=self.DEFAULT_TIMEOUT)
         except GdbTimeoutError:
+            #print("GdbTimeoutError") #TODO delete
             return []
 
     def __setResumeOnExit(self, breakpoint) -> None:
         self.__write(f'break {breakpoint}')
         self.__write('commands')
-        self.__write('jump _start') #SB updated from self.__write('run')
+        self.__write('jump _start')
         self.__write('end')
 
     def __makeBreakpoints(self, points, bplist:list, bktype='break') -> list:

@@ -10,6 +10,7 @@ import time
 import re
 import signal
 import enum
+from utils import JSON_Fuzz
 
 from utils import Fuzz
 from gdb_harness import Gdb
@@ -84,7 +85,11 @@ class Harness():
         self.out_semaphore = Semaphore()
         self.outfile = open('bad.txt', 'w')
 
-        self.useGDB = useGDB
+        if isinstance(fuzzer, JSON_Fuzz):
+            self.useGDB=False
+        else:
+            self.useGDB=useGDB
+
 
     def start(self) -> None:
         # Check if the harness has already been started
@@ -212,11 +217,19 @@ class Harness():
         total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
         slow_interval = 0
         paths = 0
-        code_coverage = 0
+        if self.useGDB == 1:
+            code_coverage = 0
+            paths = 0
+            gdbusage = 'Yes'
+        else:
+            code_coverage = 'N/A'
+            paths = 'N/A'
+            gdbusage = 'No'
         prev_coverage = 0
         coverage_interval = 0
         threads = len(enumerate()) - self.FUZZERS - 1
         timer = 0
+        
 
         # Start monitoring loop
         try:
@@ -238,7 +251,7 @@ class Harness():
                     table2 = {
                         "Total Crashes":self.crashes,
                         "GDB Detect":self.gdbDetections,
-                        "Using GDB":self.useGDB,
+                        "Using GDB":gdbusage,
                         "Code Paths":paths,
                         "Code Coverage":code_coverage,
                         "Thread Number":threads,
@@ -260,17 +273,19 @@ class Harness():
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
                     threads = len(enumerate()) - self.FUZZERS - 1
-                    if len(self.code_paths) > 2:
-                        paths = len(self.code_paths) - 1
-                        code_coverage = round(paths/self.code_paths[0],2)
+
+                    if self.useGDB == 1:
+                        if len(self.code_paths) > 2:
+                            paths = len(self.code_paths) - 1
+                            code_coverage = round(paths/self.code_paths[0],2)
+                        if prev_coverage == code_coverage:
+                            coverage_interval += 1
+                        elif prev_coverage < code_coverage:
+                            coverage_interval = 0
                     if curr_rate == 0 and slow_interval < 10:
                         slow_interval += 1
                     elif curr_rate > 0 and slow_interval > 0:
                         slow_interval -= 1
-                    if prev_coverage == code_coverage:
-                        coverage_interval += 1
-                    elif prev_coverage < code_coverage:
-                        coverage_interval = 0
 
                     print(table_format1.format("", *table1.keys())) # Prints the headers
                     print(table_format1.format("", *table1.values())) # Prints the values
@@ -284,7 +299,7 @@ class Harness():
                             print("The fuzzer seems to stuck. Consider restarting.")
                         else:
                             print()
-                        if coverage_interval > 30:
+                        if coverage_interval > 30 and self.useGDB == 1:
                             print("Code coverage has is no longer increasing. Possible infinite loop.")
 
                 elif self.success == True:
