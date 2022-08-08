@@ -1,12 +1,14 @@
 # Utilities for COMP6447 Fuzzer
 from ctypes import sizeof
+from queue import Empty
 import random
+import re
 import string
 import sys
 import json
 import math
 from tkinter import E
-import xml.etree.ElementTree as ElementTree
+import xml.etree.ElementTree as ET
 # from pwn import *
 import copy
 from random import choice, randint, uniform
@@ -88,40 +90,13 @@ class Fuzz():
     def knownNegFloat(self):
         return -1.5
     def intOverflow(self):
-        return 9999999999999999999
+        return 99999999999999999999
     def intUnderflow(self):
-        return -9999999999999999999
+        return -99999999999999999999
     def intMax(self):
         return 0x7FFFFFFF
     def intMin(self):
         return 0x80000000
-    
-    
-    '''
-        Magic bytes which often cause errors
-    '''
-    def mutate_magic(self, data):
-        # tuple = (byte-size of value, value)
-        values = [
-            (1, 0xff),
-            (1, 0x7f),
-            (1, 0),
-            (2, 0xffff),
-            (2, 0),
-            (4, 0xffffffff),
-            (4, 0),
-            (4, 0x80000000),
-            (4, 0x40000000),
-	        (4, 0x7fffffff)
-        ]
-        length = len(data) - 8  # make sure we dont write over the EOI marker
-        idx = randint(0, length)
-        n_size, n = choice(values)
-        data[idx:idx + n_size] = bytearray(n)
-        
-
-    
-    
     
     
     '''
@@ -348,7 +323,8 @@ class JSON_Fuzz(Fuzz):
             self.jsonObj : dict = json.loads(self.seed)
         except Exception:
             self.jsonObj = {}
-            
+    def updateSeed(self, new):  # we don't really care about the seed here, only jsonObj
+        self.jsonObj = new
     def checkType(self):
         try:
             json.loads(self.seed)
@@ -465,21 +441,248 @@ class JSON_Fuzz(Fuzz):
         else:
             return self.fuzz()
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
-    def __init__(self, seed):  
-        super().__init__(seed)
+    def __init__(self, seed):
+        tmp = seed.replace("\n", '')    # remove newline characters. does not affect xml validity
+        super().__init__(tmp)
+        # self.root = ET.fromstring(seed)
+        self.initial = seed
+        print("created xml fuzzer")
+        
+        # basically the known tests
+        self.bad_input = {
+            'zero' : str(self.zero()),
+            'neg': str(self.knownNeg()),
+            'large_neg' : str(self.knownLargeNegInt()),
+            'large_pos' :str(self.knownLargePosInt),
+            'larger_neg': str(self.intUnderflow()),
+            'larger_pos': str(self.intOverflow()),
+            'int_max': str(self.intMax()),
+            'int_min': str(self.intMin()),
+            'randomURL': "https://aasddasfqwegqce.com",
+            'fmt': '%s',
+            'empty': ''
+        }
+    def updateSeed(self, new):
+        self.seed = new.replace('\n', '')
+    
     def checkType(self):
         try:
-            ElementTree.fromstring(self.seed)
+            ET.fromstring(self.seed)
             return True
-        except ElementTree.ParseError:
+        except ET.ParseError:
             return False
-    def mutate():
-        pass
+    
+    '''
+		This method separates an xml in a "line by line" form.
+		Example:
+            xmlString: "<xml a="b">f00</xml>"
+            result: [ '<xml a="b">' , 'f00', '</xml>']
+		
+		Based on Robert D. Cameron's REX/Perl 1.0.
+		Original copyright notice follows:
+		REX/Perl 1.0
+		Robert D. Cameron "REX: XML Shallow Parsing with Regular Expressions",
+		Technical Report TR 1998-17, School of Computing Science, Simon Fraser
+		University, November, 1998.
+		Copyright (c) 1998, Robert D. Cameron.
+		The following code may be freely used and distributed provided that
+		this copyright and citation notice remains intact and that modifications
+		or additions are clearly identified.
+	
+		@parameter xmlString: A string representation of the xml
+		@return: A list of strings.
+    '''
+    def toList(self, xmlString):
+        TextSE = "[^<]+"
+        UntilHyphen = "[^-]*-"
+        Until2Hyphens = UntilHyphen + "(?:[^-]" + UntilHyphen + ")*-"
+        CommentCE = Until2Hyphens + ">?"
+        UntilRSBs = "[^\\]]*](?:[^\\]]+])*]+"
+        CDATA_CE = UntilRSBs + "(?:[^\\]>]" + UntilRSBs + ")*>"
+        S = "[ \\n\\t\\r]+"
+        NameStrt = "[A-Za-z_:]|[^\\x00-\\x7F]"
+        NameChar = "[A-Za-z0-9_:.-]|[^\\x00-\\x7F]"
+        Name = "(?:" + NameStrt + ")(?:" + NameChar + ")*"
+        QuoteSE = "\"[^\"]*\"|'[^']*'"
+        DT_IdentSE = S + Name + "(?:" + S + "(?:" + Name + "|" + QuoteSE +"))*"
+        MarkupDeclCE = "(?:[^\\]\"'><]+|" + QuoteSE + ")*>"
+        S1 = "[\\n\\r\\t ]"
+        UntilQMs = "[^?]*\\?+"
+        PI_Tail = "\\?>|" + S1 + UntilQMs + "(?:[^>?]" + UntilQMs + ")*>"
+        DT_ItemSE = "<(?:!(?:--" + Until2Hyphens + ">|[^-]" + MarkupDeclCE + ")|\\?" + Name + "(?:" + PI_Tail + "))|%" + Name + ";|" + S
+        DocTypeCE = DT_IdentSE + "(?:" + S + ")?(?:\\[(?:" + DT_ItemSE + ")*](?:" + S + ")?)?>?"
+        DeclCE = "--(?:" + CommentCE + ")?|\\[CDATA\\[(?:" + CDATA_CE + ")?|DOCTYPE(?:" + DocTypeCE + ")?"
+        PI_CE = Name + "(?:" + PI_Tail + ")?"
+        EndTagCE = Name + "(?:" + S + ")?>?"
+        AttValSE = "\"[^<\"]*\"|'[^<']*'"
+        ElemTagCE = Name + "(?:" + S + Name + "(?:" + S + ")?=(?:" + S + ")?(?:" + AttValSE + "))*(?:" + S + ")?/?>?"
+        MarkupSPE = "<(?:!(?:" + DeclCE + ")?|\\?(?:" + PI_CE + ")?|/(?:" + EndTagCE + ")?|(?:" + ElemTagCE + ")?)"
+        XML_SPE = TextSE + "|" + MarkupSPE		
+
+        res = re.findall(XML_SPE, xmlString)
+        res = [ x for x in res if x !='\n' ]
+
+        return res
+    
+    def parseXML(self, input):  # assumes that input is valid xml
+        self.root = ET.fromstring(input)     # this function gives the root element of xml tree
+        print("root: ", self.root)
+        for child in self.root:              # iterate through all children nodes
+            child.text = "fuck"
+            print(child, " tag: ", child.tag, "text: ", child.text)
+            for attr in self.getAttributes(child):
+                print("     >>", attr)
+
+        for x in self.root.iter():
+            print(x)
+        return
+
+
+    # return a list of all children of element
+    def getChildren(self, elem):
+        return list(elem)
+    # return a random element from list
+    def pickRandomElement(self, elems):
+        return choice(elems)
+    # check if element has children
+    def hasChild(self, elem):
+        return True if len(list(elem)) else False
+    # get element attributes as tuples (key, value)
+    def getAttributes(self, elem):  # returns 
+        return elem.items()
+    # set element attribute to (key, value)
+    def setAttribute(self, elem, key, value):
+        elem.set(key, value)
+        return elem
+    
+    # only called once to try stack overflow. 
+    # unfortunately doesnt cause any issues for all binaries, wasted my time
+    def spamElements(self, root):
+        mutation = root
+        opening = f"\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n"
+        closing = f"</SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n</SPAM>\n</SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n</SPAM>\n"
+        new_el = opening*82 + closing*82
+        add = ET.fromstring(new_el)
+        mutation.insert(0,add)
+        return mutation
+    
+    def mutateText(self, elem):
+        avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
+        if elem.tag not in avoid:
+            elem.text = "fuck"
+        return elem
+    
+    def addElement(self, root):
+        new = ET.Element("NewNode")
+        root.append(new)
+        return root
+    
+    
+    # get duplicate of an element, but without its children nodes
+    def cloneElement(self, elem):
+        # create element with same tag
+        clone = ET.Element(elem.tag) 
+        # copy attributes
+        attrs = self.getAttributes(elem)
+        for (key, val) in attrs:
+            clone.set(key, val)
+        # copy text
+        clone.text = elem.text
+        # copy tail
+        clone.tail = elem.tail
+        return clone
+    
+    
+    '''
+        Select (elem1, elem2) from tree; elem1 is the parent and elem2 is the child
+        child is recursively added to itself to create a tree
+        then add the tree to the parent
+    '''
+    def spamElementDepth(self, tree):
+        elements = self.getChildren(tree)
+        elem1 = choice(elements)
+        elements.remove(elem1)
+        elem2 = choice(elements)
+        print("e1: ", elem1)
+        print("e2: ", elem2)
+        
+        root = child = elem2
+        for i in range(3):
+            root = self.cloneElement(child)    # create clone
+            root.append(child)                  # append clone to root
+            child = root                        # set child as root
+        
+        mutation = tree
+        for elem in mutation:
+            if elem.tag == elem1.tag:
+                elem.append(root)
+        
+        return mutation
+
+    
+    def mutate(self):
+        xml = ET.fromstring(self.seed)
+        
+        # xmlList = self.toList(self.seed)
+        # for xmlItem in xmlList:
+        #     print(xmlItem)
+        
+        
+        
+        repetitions = randint(1, 1)
+        for round in range(repetitions):
+            strategy = randint(0,0)
+            if strategy == 0:
+                xml = self.spamElementDepth(xml)
+            elif strategy == 1:
+                pass
+            elif strategy == 3:
+                pass
+        
+        
+        # return self.seed
+
+        mutation = ET.tostring(xml, encoding='unicode', method='xml')
+        # print(mutation)
+        return mutation
+    
     def fuzz(self):
-        # Placeholder
-        return super().fuzz()
+        print(self.seed)
+        return self.mutate()
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Plaintext Fuzzer. No need to overwrite checkType()
 class Plaintext_Fuzz(Fuzz):
@@ -495,7 +698,6 @@ class Plaintext_Fuzz(Fuzz):
 class JPG_Fuzz(Fuzz):
     def __init__(self, seed):
         super().__init__(seed)
-        print("created jpg fuzzer")
     # I'm guessing we need to use bit flipping for this one
     def mutate(self):
         strategy = randint(0, 100)
@@ -533,9 +735,7 @@ class JPG_Fuzz(Fuzz):
         length = len(data) - 8  # make sure we dont write over the EOI marker
         idx = randint(0, length)
         n_size, n = choice(values)
-        print("magic mutate: ", idx, hex(n), n_size)
-        # data[idx:idx + n_size] = bytearray(n)
-        # return data
+        # print("magic mutate: ", idx, hex(n), n_size)
         if n_size == 1:
             if n == 0xff:			# 0xFF
                 data[idx] = 0xff
@@ -577,12 +777,12 @@ class JPG_Fuzz(Fuzz):
                 data[idx + 2] = 0xff
                 data[idx + 3] = 0xff
         return data
-      
+       
     # randomly flip a proportion of bits
     def flipRatioBits(self, data, ratio):
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         num_of_flips = int(length * ratio)
-        print("flip bits ratio: ", ratio, num_of_flips)
+        # print("flip bits ratio: ", ratio, num_of_flips)
         indexes = []
         flip_array = [1,2,4,8,16,32,64,128]
         while len(indexes) < num_of_flips:
@@ -593,7 +793,7 @@ class JPG_Fuzz(Fuzz):
         return data
     
     def flipRandomBit(self, data):
-        print("flip single bit")
+        # print("flip single bit")
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         idx = randint(0, length)
         flip_array = [1,2,4,8,16,32,64,128]
@@ -601,7 +801,7 @@ class JPG_Fuzz(Fuzz):
         data[idx] = data[idx] ^ mask
         return data
     def flipRandomByte(self, data):
-        print("flip single byte")
+        # print("flip single byte")
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         idx = randint(0, length)
         data[idx] = data[idx] ^ 0xff
@@ -609,7 +809,7 @@ class JPG_Fuzz(Fuzz):
     def flipRatioBytes(self, data, ratio):
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         num_of_flips = int(length * ratio)
-        print("flip ratio bytes", ratio*100, num_of_flips)
+        # print("flip ratio bytes", ratio*100, num_of_flips)
         indexes = set()
         while len(indexes) < num_of_flips:
             indexes.add(randint(0, length))
@@ -665,7 +865,7 @@ def getType(filename) -> Fuzz or None:
         fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
         print("getType() - Detected XML")
-        # XML_Fuzz.fuzz(inputTxt)
+        fuzzer = XML_Fuzz(inputTxt)
     elif type == TYPE_PLAINTEXT:
         print("getType() - Detected Plaintext")
         # Plaintext_Fuzz.fuzz(inputTxt)
@@ -676,10 +876,16 @@ def getType(filename) -> Fuzz or None:
 
 if __name__ == '__main__':
     fuzzer = getType(sys.argv[1])
-    mutation = fuzzer.mutate()
-    # print(mutation)
     
-    f = open("tests/mutated.txt", "wb+")
+    mutation = fuzzer.mutate()
+    print(mutation)
+    
+    
+    # f = open("tests/mutated.txt", "wb+")
+    
+    
+    
+    f = open("tests/mutated.txt", "w")
     f.write(mutation)
     f.close()
     
