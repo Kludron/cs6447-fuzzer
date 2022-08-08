@@ -18,8 +18,6 @@ from utils import CSV_Fuzz
 
 class Gdb():
     def __init__(self, gdb: GdbController, binary: str, queue: Queue, thread, paths: list, paths_semaphore: Semaphore) -> None:
-    # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz, thread, semaphore, counter) -> None:
-    # def __init__(self, gdb: GdbController, binary: str, fuzzer: Fuzz) -> None:
         self.gdb = gdb
         self.binary = binary
         self.cpoints = dict()
@@ -28,22 +26,15 @@ class Gdb():
         self.backtrace = dict()
         self.response = list()
         self.DEFAULT_TIMEOUT = 0.36
-        # self.fuzzer = fuzzer
         self.thread = thread
-        # self.semaphore = semaphore
-        # self.counter = counter
         self.queue = queue
         self.code_paths = paths
         self.code_paths_semaphore = paths_semaphore
-
-        self.counter = 0    #SB added counter and semaphore to test known bad text
-        self.c_semaphore = Semaphore()
 
         if not os.path.isfile(binary):
             raise FileNotFoundError
         # Load the file into gdb
         self.__write(f'file {binary}')
-
 
 
     def start(self) -> None:
@@ -59,7 +50,7 @@ class Gdb():
             # Binary does not have any input functions
             print("Could not detect any input functions")
         else:
-            self.input_bpoints = self.__makeBreakpoints(input_funcs, self.input_bpoints, bktype='tbreak')
+            self.input_bpoints = self.__makeBreakpoints(input_funcs, self.input_bpoints, bktype='break')
 
 
         # Set temporary breakpoints at all functions
@@ -67,12 +58,12 @@ class Gdb():
             raise Exception("Could not detect any functions")
         else:
             self.func_bpoints = self.__makeBreakpoints(functions, self.func_bpoints, bktype='tbreak') 
+            self.code_paths_semaphore.acquire()
             if len(self.code_paths) == 0:
                 #If it hasn't been done already store the number of functions in the binary
-                #as the first element in the code_paths list
-                self.code_paths_semaphore.acquire()
+                #as the first element in the code_paths list, use this to calculate code coverage
                 self.code_paths.append(len(self.func_bpoints))
-                self.code_paths_semaphore.release()
+            self.code_paths_semaphore.release()
 
         # Create breakpoint at _exit
         response = self.__write('start')
@@ -91,83 +82,62 @@ class Gdb():
                     break
             else:
                 response = self.__write('continue') 
-                continue
-            
+                continue            
             # Check if persistent breakpoint is hit, or program has exited
             if message == 'stopped':
-                #print(f'{self.thread}: message == stopped')
-                #pprint(recopy)
                 try:
                     output = response['payload']
                     reason = output['reason']
                 except (KeyError) as e:
                     break
-                # print(reason)
-                # Check if persistent breakpoint is hit
+                # Check if persistent breakpoint was hit,
                 if reason == 'breakpoint-hit': 
-                    print(f'{self.thread}: message == breakpoint-hit')
-                    pprint(f'{self.thread}:\n{recopy}')
                     cpID = time.time()
-
-                    # Check if breakpoint was at an input function
+                    bpID = response["payload"]["bkptno"]
+                    #If breakpoint was an input function delete the breakpoint and create a checkpoint
                     try:
-                        if response["payload"]["frame"]["addr"] in self.input_bpoints:   
+                        if response["payload"]["frame"]["addr"] in self.input_bpoints:
+                            #Delete breakpoint at input function and replace with checkpoint
+                            self.gdb.write(f'delete breakpoints {bpID}') 
                             # Create a checkpoint at this input function
-                            self.__checkpointCreate(cpID)
+                            self.__checkpointCreate(bpID)
+                            response = self.__write('continue')
+                        else:
+                            #Only other type of permantent function is on exit, restore checkpoint if hit
+                            pass
                     except (KeyError, TypeError):
                         pass
                     finally:
-                        # Store the path
-                        response = self.gdb.write(f'backtrace {cpID}')
+                        #Perform backtrace to save path for code coverage
+                        response = self.gdb.write(f'backtrace {bpID}')
                 
                 # Check if the program exited normally
                 elif reason == 'exited-normally':
-                    #print(f'{self.thread}: reason == exited-normally')
                     print(f'{self.thread}: Under normal operations we should not get here') 
-                    #response = self.__write('info breakpoints')
-                    #pprint(f'{self.thread}:\n{response}')
                     break
-
                 ###### [TODO] What about if the program crashes?
                 else:
-                    #print(f'{self.thread}: message == else')
                     try:
-                        #print()
                         reason = output['reason']
                         signal = output['signal-name']
-                        if reason == 'signal-received' and signal != "SIGINT":  #SB updato exclude SIGINT other all return
-                            #pprint(f'---------------------------------------------')
-                            #print(f'{self.thread}: signal-recieved')
-                            #print(f'{self.thread}: {payload}')
-                            #print(f'{self.thread}: {output["signal-name"]}')
-                            #pprint(f'---------------------------------------------')
-                            return (payload, output['signal-name'])
+                        if reason == 'signal-received':
+                            return (payload, signal)
 
                     except (KeyError):
                         print("="*20 + "Unhandled" + "="*20)
                         print(reason)
                         print(output)
-                        # print(response)
-                        # print(payload)
                     finally:
                         break
-
-            # Check if temporary breakpoint is hit
+            # Check if temporary breakpoint at function was hit
             elif message == 'breakpoint-deleted':
-                #print(f'{self.thread}: message == breakpoint-deleted')
-                #pprint(f'{self.thread}:\n{recopy}')
-                # print(f'Hit function for first time, deleting a temporary breakpoint')
                 cpID = time.time()
+                #Peformate backtrace to collect code path
                 response = self.gdb.write(f'backtrace {cpID}')
-
             # Check if previous execute command is completed and returning  
             elif message == 'done':
-                #print(f'{self.thread}: message == done')
-                #pprint(f'{self.thread}:\n{recopy}')
                 try:
-                    if 'backtrace' in recopy[0]["payload"]:             #SB updated this response was overwritten and this was broken as a resulr\t
-                        #print(f'{self.thread}: parsing backtrace results')
-                        #pprint(f'{self.thread}:\n{recopy}')
+                    if 'backtrace' in recopy[0]["payload"]:   
                         self.__doBacktrace(recopy)
                 except (TypeError, KeyError):
                     pass
@@ -176,39 +146,13 @@ class Gdb():
 
             # Check if the program is waiting for input
             elif message == 'running':
-                #print(f'{self.thread}: message == running' )
-                #pprint(f'{self.thread}:\n{recopy}')
-                # payload = self.fuzzer.fuzz()
                 payload = self.queue.get(timeout=0.2)
-                #print(f'{self.thread}: payload: {payload}')
-                # self.semaphore.acquire()
-                # print(self.counter)
-                # self.counter += 1
-                # self.semaphore.release()
-                # print(payload)
-                # payload = 'header,must,stay,intact\n'
-                # payload += 'a,a,a,a\n' * 120  
-                #self.c_semaphore.acquire()      #SB this temporarily to test with known bad text
-                #self.counter += 1
-                #self.c_semaphore.release()
-                # if self.counter == 20:
-                #     response = self.__write(self.BAD)
-                # else:
                 response = self.__write(f'{payload}')
-                
-                #response = self.__write(f'{payload}')
-                #pprint(f'{self.thread}:{response}')
+            #Check if permanent breakpoint was hit
             elif message == 'breakpoint-modified':
-                #print(f'{self.thread}: message == breakpoint-modified' )
-                #pprint(f'{self.thread}:\n{recopy}')
                 response = self.__write('continue')
-
             else:
-            #    print(f'{self.thread}: else -> self.__setResumeOnExit')        #SB Commented these out as I think __setResumeOnExit only need to be run before loop        
-            #    self.__setResumeOnExit
-                #pprint(f'{self.thread}: else')
-                #pprint(f'{self.thread}:\n{recopy}')
-                pass  #SB may need to remove this else or otherwise populate with other requirements
+                pass
         if self.thread.alive:
             return payload, response
         else:
@@ -395,7 +339,7 @@ class Gdb():
         cp = self.__getConsole(self.__write(f'checkpoint'))
         cp_num = cp.split()[1].strip(":")
         self.cpoints[cpID] = { "base" : cp_num,
-                          "curr" : cp_num}
+                                "curr" : cp_num}
 
     def __checkpointUpdate(self, cpID):
         #Update base for given checkpoint ID, delete old base checkpoint

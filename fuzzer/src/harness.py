@@ -59,7 +59,7 @@ class Harness():
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
-        self.TESTERS = 40
+        self.TESTERS = 30
         self.FUZZERS = 2
         self.LOGFILE = open('log.out', 'w')
 
@@ -105,10 +105,6 @@ class Harness():
             for _ in range(self.TESTERS):
                 thread = Thread(target=self.test, daemon=True)        
                 thread.start()
-                # if self.useGDB:
-                #    self.gdb = Gdb(GdbController(), self.program, self.queue, thread)
-                #    self.gdb.setup()
-
             # Create and start fuzzer threads
             for _ in range(self.FUZZERS):
                 thread = Thread(target=self.fuzz, daemon=True)
@@ -122,7 +118,6 @@ class Harness():
             try:
                 # Note: GdbTesting ignores this. This, therefore, renders the fuzz function as unused.
                 fuzzInput = self.queue.get(timeout=0.2)
-                # fuzzInput = "header,must,stay,intact"
                 pass
             except Empty:
                 pass
@@ -139,10 +134,8 @@ class Harness():
                                 self.gdbDetections += 1
                                 self.c_semaphore.release()
                                 # Verify the payload with recreation
-                                #print(payload) 
                                 fuzzInput, signal = payload
                                 subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
-                                #, preexec_fn = lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)
                                 self.LOGFILE.write(fuzzInput+'\n...\n')
                             except (ValueError):
                                 pass
@@ -157,7 +150,6 @@ class Harness():
                     self.success_semaphore.acquire()
                     self.success = True
                     self.crash_type = Error(e.returncode).name
-                    # self.crash_type = e.returncode
                     self.success_semaphore.release() 
         sys.exit(0)
 
@@ -210,7 +202,7 @@ class Harness():
     def monitor(self, refresh_time=1) -> None:
         self.start()
         # Set defaults
-        curr_count = self.counter - self.queue.qsize() #SB updates to subtract self.queue.qsize()
+        curr_count = self.counter - self.queue.qsize()
         prev_count = 0
         start_time = time.time()
         curr_time = start_time
@@ -223,30 +215,18 @@ class Harness():
         code_coverage = 0
         prev_coverage = 0
         coverage_interval = 0
+        threads = len(enumerate()) - self.FUZZERS - 1
+        timer = 0
 
         # Start monitoring loop
         try:
             time.sleep(2)
             start = time.time()
-            while time.time() < start + 3*60:
-            #while True:
+            #while time.time() < start + 3*60:
+            while True:
                 if prev_time != 0 and self.success == False:
 
                     # Create the table
-                    '''
-                    table1 = {
-                        "Binary Name":self.program,
-                        "Run Time":total_time,
-                        "Total Tests":curr_count,
-                        "Cur Tests\Sec":curr_rate,
-                        "Total Tests\Sec":total_rate,
-                        "Total Crashes":self.crashes,
-                        "GDB Detect":self.gdbDetections,
-                        "Using GDB":self.useGDB,
-                        "Code Paths":paths,
-                        "Code Coverage":code_coverage,
-                    }
-                    '''
                     table1 = {
                         "Binary Name":self.program,
                         "Run Time":total_time,
@@ -261,6 +241,7 @@ class Harness():
                         "Using GDB":self.useGDB,
                         "Code Paths":paths,
                         "Code Coverage":code_coverage,
+                        "Thread Number":threads,
                     }
                     
                     table_format1 = "{:<20}" * (len(table1.keys()) + 1)
@@ -278,9 +259,10 @@ class Harness():
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
                     total_rate = round(curr_count/(curr_time - start_time))
+                    threads = len(enumerate()) - self.FUZZERS - 1
                     if len(self.code_paths) > 2:
                         paths = len(self.code_paths) - 1
-                        code_coverage = paths/self.code_paths[0]
+                        code_coverage = round(paths/self.code_paths[0],2)
                     if curr_rate == 0 and slow_interval < 10:
                         slow_interval += 1
                     elif curr_rate > 0 and slow_interval > 0:
@@ -297,12 +279,13 @@ class Harness():
                     print(table_format2.format("", *table2.values())) # Prints the values
                     print()
                     print("Press Ctrl + C to exit.")
-                    if slow_interval > 5:
-                        print("The fuzzer seems to stuck. Consider restarting.")
-                    else:
-                        print()
-                    if coverage_interval > 30:
-                        print("Code coverage has is no longer increasing. Possible infinite loop.")
+                    if timer > 15:
+                        if slow_interval > 5:
+                            print("The fuzzer seems to stuck. Consider restarting.")
+                        else:
+                            print()
+                        if coverage_interval > 30:
+                            print("Code coverage has is no longer increasing. Possible infinite loop.")
 
                 elif self.success == True:
                     print(f"Success! Crash type: {self.crash_type}")
@@ -313,6 +296,7 @@ class Harness():
                 prev_time = curr_time
                 prev_count = curr_count
                 prev_coverage = code_coverage
+                timer += 1
                 time.sleep(refresh_time)
 
         except KeyboardInterrupt: # Ctrl + C
