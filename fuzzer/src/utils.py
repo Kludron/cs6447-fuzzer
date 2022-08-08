@@ -237,19 +237,6 @@ class Fuzz():
     
     
     
-    
-    
-
-
-
-
-
-
-
-
-
-
-
 
 class CSV_Fuzz(Fuzz):
     
@@ -412,8 +399,6 @@ class JSON_Fuzz(Fuzz):
             pass
         
         return mutation
-    
-
     
     '''
         Remove tokens from the object

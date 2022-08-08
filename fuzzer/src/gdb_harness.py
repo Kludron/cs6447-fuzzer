@@ -160,10 +160,9 @@ class Gdb():
             # Check if the program is waiting for input
             elif message == 'running':
                 #print("running: entering payload") #TODO delete
-                payload = self.queue.get(timeout=0.2)
+                payload = self.queue.get(timeout=0.5)
                 #print(f"payload: {payload}") #TODO delete
                 response = self.__write(f'{payload}')
-                gdb.Gdb
             #Check if permanent breakpoint was hit
             elif message == 'breakpoint-modified':
                 response = self.__write('continue')
@@ -332,10 +331,10 @@ class Gdb():
 
         # Hash instruction pointer path as key
         path = hashlib.sha256(path.encode('utf-8')).hexdigest()
+        self.code_paths_semaphore.acquire()
         if path not in self.code_paths:
-            self.code_paths_semaphore.acquire()
             self.code_paths.append(path)
-            self.code_paths_semaphore.release()
+        self.code_paths_semaphore.release()
 
     #############################
     #    Checkpoint Functions

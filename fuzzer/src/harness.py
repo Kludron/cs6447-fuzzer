@@ -10,8 +10,8 @@ import time
 import re
 import signal
 import enum
-from utils import JSON_Fuzz
 
+from utils import JSON_Fuzz
 from utils import Fuzz
 from gdb_harness import Gdb
 from pygdbmi.gdbcontroller import GdbController
@@ -59,9 +59,9 @@ class Harness():
         self.fuzzer = fuzzer
 
         self.QUEUE_SIZE = 1000
-        self.MAX_TESTS = 1000000000
+        self.MAX_TESTS = 100000000
         self.TESTERS = 30
-        self.FUZZERS = 2
+        self.FUZZERS = 1
         self.LOGFILE = open('log.out', 'w')
 
         self.queue = Queue(maxsize=self.QUEUE_SIZE)
@@ -207,6 +207,7 @@ class Harness():
     def monitor(self, refresh_time=1) -> None:
         self.start()
         # Set defaults
+        #curr_count = self.counter
         curr_count = self.counter - self.queue.qsize()
         prev_count = 0
         start_time = time.time()
@@ -268,6 +269,7 @@ class Harness():
 
                     # Update variables
                     curr_time = time.time()
+                    #curr_count = self.counter
                     curr_count = self.counter - self.queue.qsize()
                     total_time = str(datetime.timedelta(seconds = round(curr_time - start_time)))
                     curr_rate = round((curr_count-prev_count)/(curr_time - prev_time))
