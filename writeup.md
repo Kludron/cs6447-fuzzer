@@ -42,12 +42,12 @@ The fuzzer first takes in the input (seed) file and detects the binary type by p
 These are the basic strategies for each successfully implemented fuzzer. 
 (Note) Due to lack of time and resources, we were unable to implement the Plaintext fuzzer.
 
-| Input Type | Known Ints | Known 'Bad' Bytes | Bit Flips | Byte Flips | Duplication |
-|:----------:|:----------:|:-----------------:|:---------:|:----------:|:-----------:|
-|     CSV    |      Y     |         Y         |     N     |      N     |      N      |
-|    JSON    |      Y     |         Y         |     Y     |      Y     |      N      |
-|     XML    |      Y     |         Y         |     Y     |      Y     |      Y      |
-|     JPG    |      N     |         Y         |     Y     |      Y     |      N      |
+| Input Type | Known Ints | Known 'Bad' Bytes | Bit Flips | Byte Flips | Replacement | Duplication |
+|:----------:|:----------:|:-----------------:|:---------:|:----------:|:-----------:|:-----------:|
+|     CSV    |      Y     |         Y         |     N     |      N     |      Y      |      N      |
+|    JSON    |      Y     |         Y         |     Y     |      Y     |      Y      |      N      |
+|     XML    |      Y     |         Y         |     Y     |      Y     |      Y      |      Y      |
+|     JPG    |      N     |         Y         |     Y     |      Y     |      Y      |      N      |
 
 #### **Known Values**
 The most commonly used strategy across all fuzzers is known values. Such known calues are integers, floats or characters which are known to be troublesome if the binary is unable to parse them well. This includes the testing of integer overflow/underflows, by using INT_MAX and INT_MIN as well as incredibly large input values to cause buffer overflows. 
@@ -56,9 +56,28 @@ Examples:
 - 0, -1, 1.5, 0x80000000, 0xffffffff, ...
 - %s, %p, ...
 
-
 #### **Bit/Byte Flips**
-Bit flips are effective in drastically changing string values. This strategy is used the most in JPG fuzzer, where the mutable input is in the form of a bytearray. However, the issue with bit flips are its inefficiency, especially when dealing with bytearrays of large sizes. Simply changing a single bit out of hundreds of thousands of bits in a bytearray might potentially result in a bad input, but the probability of achieving this result in infinitesimally small. It is because of this observation that more bits should be changed at one go to optimise the fuzzer, and this is where ratio-flipping and byte-flipping comes into play. Byte flipping increases the odds of finding a bad input, and implementing a ratio flip where a defined proportion of bits/bytes are flipped at one go is another attempt at optimisation. 
+Bit flips are effective in drastically changing string values. This strategy is used the most in JPG fuzzer, where the mutable input is in the form of a bytearray. However, the issue with bit flips are its inefficiency, especially when dealing with bytearrays of large sizes. Simply changing a single bit out of hundreds of thousands of bits in a bytearray might potentially result in a bad input, but the probability of achieving this result in infinitesimally small. It is because of this observation that more bits should be changed at one go to optimise the fuzzer, and this is where ratio-flipping and byte-flipping comes into play. Byte flipping increases the odds of finding a bad input, and implementing a ratio flip where a defined proportion of bits/bytes are flipped at one go is another attempt at optimisation. However, a particular drawback is that with a higher proportion of bytes flipped, the likelihood of corrupting the type-specific bytearray format is greater by order of magnitude. Therefore, finding a safe ratio and monitoring the probability of executing the ratio strategy is important, so as to find a balance between generating bad input and generating input with higher probability of inciting a binary crash. 
+
+
+#### **XML Fuzzer**
+Fuzzing XML input is several times more challenging than of the other input types here, because of its structure and more complicated syntax. In order to generate effective mutations, we utilised 3 main strategies, the latter two of which were inspired by CENSUS' 2015 presentation on fuzzing methods and observations. [Source](https://census-labs.com/media/choronzon-zeronights-2015.pdf)
+1.  Depth/Breadth-wise insertion of elements to potentially trigger stack overflow error in binary or XML parser
+*   nesting multiple elements
+*   creating multiple children in parent nodes
+2.  Chromosome Recombination
+*   Restructuring of XML tree
+*   addition/removal/replacement/duplication of nodes
+*   copying content from one element to another
+*   moving content from one element to another
+3.  Heirarchial Recombination
+*   Restructuring of XML tree
+*   Redefining node heirarchies
+Implementation of these strategies and their sub-strategies can generate effective mutations. However, we observe that the need to iterate through the tree to access parent and children nodes might cause some drop in fuzzer performance.
+
+
+#### **JPG Fuzzer**
+Implementing the JPG fuzzer requires a deeper understanding of binary file types. In order to identify a binary file as JPG, PNG, etc., these files contain signature bytes, either at the beginning or end of the file, or both. JPG's SOI and EOI markers are at both ends, hence some care must be taken when fuzzing so as to not overwrite these bytes. One specific strategy used in this fuzzer is 'magic bytes' where random locations in the input are overwritten with these values. These 'magic bytes' are actually of the same concept as Known Values, because they are notorious for causing errors when in the right place. 
 
 
 
@@ -70,7 +89,7 @@ Bit flips are effective in drastically changing string values. This strategy is 
 
 
 
-###Harness
+### Harness
 The harness is capable of two separate ‘modes’ - GBD mode and native mode
 #####GBD Mode
 GDB Mode is the default mode of operation for the fuzzer. In this mode, the harness spawns a GDB instance within which the selected binary is run. GDB mode is intended offer the following features:
@@ -89,7 +108,7 @@ Crash type detection is achieved by intercepting and parsing GDB messages to ide
 
 Infinite loop detection is identified when rate of new code points seen reduced to zero for a defined amount of time. This indicates that previous paths in the code are continuously being traverse and the fuzzer is potentially caught in a loop. This is differentiated from simply running slowly as slow performance is identified by the rate at which fuzzing input is injected into the binary.
 
-#####Native Mode
+##### Native Mode
 Native mode if an optional mode that fuzzes the binary directly instead of running on top of GDB. When compared to GDB Mode, Native Mode offers the following benefits:
 
  * High performance
@@ -102,12 +121,10 @@ Like GDB Mode, Native Mode is able to detect the type of crash that occured when
 
 Some binaries require an EOF signal to properly receive and process the fuzzed input. GDB is not able to send such a signal so the binary is left waiting for more input and hangs. Native Mode avoids this situation as an EOF if automatically sent with the input. For those binaries requiring files types that need an EOF, the harness automatically runs in Native Mode, this is not configurable.
 
-###Fuzzer
-The Fuzzer incorporates different fuzzing engines for different file formats
-TODO
 
 
-##Future Improvements
+## Future Improvements
+
 The following a list of features that could not be fully implemented but would improve the performance an effectiveness of the fuzzer:
 
  * Improved In Memory Resetting
@@ -118,6 +135,11 @@ The following a list of features that could not be fully implemented but would i
     * Being able to run binaries that require EOFs for inputs in GDB would allow the features of GDB Mode to be available for these binaries.
  * Wider Binary Support
     * We did not have the time to complete the fuzzing engines for all necessary binaries.
+ * More effective fuzzing strategies
+    * Some of the strategies used were general methods used. However, these methods are not very effective. For example, if an arithmetic strategy does not work, there is no point in randomising values over a very large range when a only a small range of values is required to check if it can cause the binary to crash. 
+ * Better communication between the fuzzer and the harness
+    * the fuzzer could have been greatly optimised if we could implement better communication and detection functionality between it and the harness.
+    * this could have improved execution path discovery by a significant extent if we are able to quickly identify the strategies with greater success rate. 
 
 
 ------------------
