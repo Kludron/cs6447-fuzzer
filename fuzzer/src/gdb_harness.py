@@ -11,10 +11,11 @@ from pprint import pprint
 import time
 import hashlib
 
-from utils import Fuzz
-
 # For testing
+from utils import Fuzz
 from utils import CSV_Fuzz
+
+MAX_LOOPS = 5
 
 class Gdb():
     def __init__(self, gdb: GdbController, binary: str, queue: Queue, thread, paths: list, paths_semaphore: Semaphore) -> None:
@@ -25,7 +26,7 @@ class Gdb():
         self.input_bpoints = dict()
         self.backtrace = dict()
         self.response = list()
-        self.DEFAULT_TIMEOUT = 0.36
+        self.DEFAULT_TIMEOUT = 0.2
         self.thread = thread
         self.queue = queue
         self.code_paths = paths
@@ -37,7 +38,7 @@ class Gdb():
         self.__write(f'file {binary}')
 
 
-    def start(self) -> None:
+    def start(self) -> tuple:
         # Get all functions
         func_info = self.__getConsole(self.gdb.write('info functions'))
         functions = self.__getFunctions(func_info, specifier=self.__isGoodFunction)
@@ -71,9 +72,12 @@ class Gdb():
         response = self.__write('continue')
 
         # Set the default payload
+        loopCount = 0
         payload = ""
         while self.thread.alive:            
+            # print(response)
             if response:
+                loopCount = 0
                 try:
                     recopy = response
                     response = response[-1]
@@ -81,8 +85,12 @@ class Gdb():
                 except (TypeError, KeyError, IndexError) as e:
                     break
             else:
-                response = self.__write('continue') 
-                continue            
+                response = self.__write('-exec-interrupt')
+                if loopCount >= MAX_LOOPS:
+                    break
+                else:
+                    loopCount += 1
+                    continue            
             # Check if persistent breakpoint is hit, or program has exited
             if message == 'stopped':
                 try:
@@ -147,7 +155,8 @@ class Gdb():
             # Check if the program is waiting for input
             elif message == 'running':
                 payload = self.queue.get(timeout=0.2)
-                response = self.__write(f'{payload}')
+                # print(payload)
+                response = self.__write(payload)
             #Check if permanent breakpoint was hit
             elif message == 'breakpoint-modified':
                 response = self.__write('continue')
@@ -156,7 +165,7 @@ class Gdb():
         if self.thread.alive:
             return payload, response
         else:
-            return None
+            return tuple()
 
 
     def __getConsole(self, output:list) -> str:
@@ -168,7 +177,7 @@ class Gdb():
         """
         return ''.join([item['payload'] for item in output if item['type'] == 'console'])
 
-    def __getFunctions(self, output:list, specifier) -> list:
+    def __getFunctions(self, output:str, specifier) -> list:
         """
         params:
             :output: The output from GdbController().write()
@@ -267,6 +276,7 @@ class Gdb():
         try:
             return self.gdb.write(content, timeout_sec=self.DEFAULT_TIMEOUT)
         except GdbTimeoutError:
+            # print(content)
             return []
 
     def __setResumeOnExit(self, breakpoint) -> None:
@@ -275,7 +285,7 @@ class Gdb():
         self.__write('jump _start') #SB updated from self.__write('run')
         self.__write('end')
 
-    def __makeBreakpoints(self, points, bplist:list, bktype='break') -> list:
+    def __makeBreakpoints(self, points, bplist:dict, bktype='break') -> dict:
         """
         params:
             :points: list of breakpoints
@@ -325,12 +335,12 @@ class Gdb():
 
     def __checkpointRestore(self, cpID):
         #Restore to base checkpoint thread, update curr checkpoint thread and delete old checkpoint thread
-        self.__write(f'restart {cpoints[cpID]["base"]}')
-        self.__write(f'delete checkpoint {cpoints[cpID]["curr"]}')
+        self.__write(f'restart {self.cpoints[cpID]["base"]}')
+        self.__write(f'delete checkpoint {self.cpoints[cpID]["curr"]}')
         cp = self.__getConsole(self.gdb.write(f'checkpoint'))
         cp_num = cp.split()[1].strip(":")
         self.cpoints[cpID]["curr"] = cp_num
-        self.__write(f'restart {cpoints[cpID]["curr"]}')
+        self.__write(f'restart {self.cpoints[cpID]["curr"]}')
         # print(self.__getConsole(self.__write(f'info checkpoint')))
 
     def __checkpointCreate(self, cpID):
@@ -343,12 +353,8 @@ class Gdb():
 
     def __checkpointUpdate(self, cpID):
         #Update base for given checkpoint ID, delete old base checkpoint
-        self.__getConsole(self.__write(f'delete checkpoint {cpoints[cpID]["base"]}'))
+        self.__getConsole(self.__write(f'delete checkpoint {self.cpoints[cpID]["base"]}'))
         cp = self.__getConsole(self.__write(f'checkpoint'))
         cp_num = cp.split()[1].strip(":")
         self.cpoints[cpID]["base"] = cp_num
 
-
-if __name__ == '__main__':
-    gdb = Gdb(GdbController(), sys.argv[1], CSV_Fuzz('header,must,stay,intact\na,b,c,def\ngh,123,aom,test'))
-    gdb.start()

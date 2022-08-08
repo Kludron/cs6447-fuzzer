@@ -59,7 +59,7 @@ class Harness():
 
         self.QUEUE_SIZE = 1000
         self.MAX_TESTS = 1000000000
-        self.TESTERS = 30
+        self.TESTERS = 20
         self.FUZZERS = 2
         self.LOGFILE = open('log.out', 'w')
 
