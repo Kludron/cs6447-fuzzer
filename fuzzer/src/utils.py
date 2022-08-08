@@ -649,27 +649,46 @@ class XML_Fuzz(Fuzz):
         if strategy == 3:
             # fuzz text of random element based on bad input or random string
             # print("C-3")
-            elements = self.levelOneElements(tree)
-            target = choice(elements)
-            avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
-            if target.tag not in avoid:
-                
-                if randint(0, 1) == 0:
-                    text = choice(list(self.bad_input.values()))
-                else:
-                    text = self.generateString()
-                target.text = text
+            if randint(0,1) == 0:
+                elements = self.levelOneElements(tree)
+                target = choice(elements)
+                avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
+                if target.tag not in avoid:
+                    if randint(0, 1) == 0:
+                        text = choice(list(self.bad_input.values()))
+                    else:
+                        text = self.generateString()
+                    target.text = text
+            else:
+                elements = self.levelTwoElements(tree)
+                parent, target = choice(elements)
+                avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
+                if target.tag not in avoid:
+                    
+                    if randint(0, 1) == 0:
+                        text = choice(list(self.bad_input.values()))
+                    else:
+                        text = self.generateString()
+                    target.text = text
                 # print("target: ", target)
                 # print("text: ", text)
         if strategy == 4:
             # fuzz the attribute value of random element
             # print("C-4")
-            elements = self.levelOneElements(tree)
-            target = choice(elements)
-            attributes = target.items()
-            for attr in attributes:
-                newAttr = choice(list(self.bad_input.values()))
-                target.set(attr[0], newAttr)
+            if randint(0,1) == 0:
+                elements = self.levelOneElements(tree)
+                target = choice(elements)
+                attributes = target.items()
+                for attr in attributes:
+                    newAttr = choice(list(self.bad_input.values()))
+                    target.set(attr[0], newAttr)
+            else:
+                elements = self.levelTwoElements(tree)
+                parent, target = choice(elements)
+                attributes = target.items()
+                for attr in attributes:
+                    newAttr = choice(list(self.bad_input.values()))
+                    target.set(attr[0], newAttr)
         if strategy == 5:
             # add attribute to random element
             # print("C-5")
