@@ -466,7 +466,6 @@ class XML_Fuzz(Fuzz):
         super().__init__(tmp)
         # self.root = ET.fromstring(seed)
         self.initial = seed
-        print("created xml fuzzer")
         # basically some known tests
         self.bad_input = {
             'zero' : str(self.zero()),
@@ -1000,7 +999,7 @@ def getType(filename) -> Fuzz or None:
         fuzzer = XML_Fuzz(inputTxt)
     elif type == TYPE_PLAINTEXT:
         print("getType() - Detected Plaintext")
-        # Plaintext_Fuzz.fuzz(inputTxt)
+        fuzzer = Plaintext_Fuzz(inputTxt)
     elif type == TYPE_JPG:
         print("getType() - Detected JPG")
         fuzzer = JPG_Fuzz(inputTxt)
