@@ -252,7 +252,7 @@ class Harness():
                     table2 = {
                         "Total Crashes":self.crashes,
                         "GDB Detect":self.gdbDetections,
-                        "Harnes Mode":mode,
+                        "Mode":mode,
                         "Code Paths":paths,
                         "Code Coverage":code_coverage,
                         "Thread Number":threads,
