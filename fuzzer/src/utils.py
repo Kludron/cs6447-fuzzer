@@ -8,6 +8,7 @@ import sys
 import json
 import math
 from tkinter import E
+from xml.dom.minidom import Element
 import xml.etree.ElementTree as ET
 # from pwn import *
 import copy
@@ -626,8 +627,8 @@ class XML_Fuzz(Fuzz):
         print("e2: ", elem2)
         
         root = child = elem2
-        for i in range(3):
-            root = self.cloneElement(child)    # create clone
+        for i in range(randint(1, 128)):        # no point going too deep
+            root = self.cloneElement(child)     # create clone
             root.append(child)                  # append clone to root
             child = root                        # set child as root
         
@@ -635,28 +636,136 @@ class XML_Fuzz(Fuzz):
         for elem in mutation:
             if elem.tag == elem1.tag:
                 elem.append(root)
-        
         return mutation
 
+
+    '''
+        Select (elem1, elem2) from tree; elem1 is the parent and elem2 is the child
+        child is added to parent multiple times
+    '''
+    def spamElementBreadth(self, tree):
+        elements = self.getChildren(tree)
+        elem1 = choice(elements)
+        elements.remove(elem1)
+        elem2 = choice(elements)
+        print("e1: ", elem1)
+        print("e2: ", elem2)
+        
+        mutation = tree
+        for elem in mutation:
+            if elem.tag == elem1.tag:
+                clone = self.cloneElement(elem2)
+                for i in range(randint(1, 128)): 
+                    elem.append(clone)
+        return tree 
+
+    '''
+        Restructuring of elements
+        - add/remove/replace/duplicate/shuffle content(s) in element
+        - add contents from one element to another
+        - move contents from one element to another
+    '''
+    def chromosomeRecombination(self, tree):
+        mutation = tree
+        return mutation
+
+
+    '''
+        Restructuring of element heirarchy
+        - child go up one level
+        - child swap with parent
+    '''
+    def heirarchialRecombination(self, tree):
+        mutation = tree
+        l2_elems = self.levelTwoElements(tree)
+        strategy = randint(1, 1)
+        if strategy == 0:
+            print("H-0")
+            parent, child = choice(l2_elems)
+            print("pair: ", parent, child)
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        parent.remove(child)
+                        print("removed")
+                    except:
+                        continue
+            mutation.append(child)
+            
+        if strategy == 1:
+            print("H-1")
+            parent, child = choice(l2_elems)
+            print("pair: ", parent, child)
+            pos = -1
+            count = 0
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        parent.remove(child)
+                        mutation.remove(parent)
+                        pos = count
+                    except:
+                        continue
+                else :
+                    count += 1
+            child.append(parent)
+            mutation.insert(pos-1, child)     # insert the new child node to where the old parent node used to be
+        return mutation # can't believe this works
+
+    
+    '''
+        Get elements
+    '''
+    def levelOneElements(self, root):
+        return self.getChildren(root)
+    '''
+        Get single nested elements
+        returns tuple (parent, child)
+    '''
+    def levelTwoElements(self, root):
+        elements = []
+        for elem in self.getChildren(root):
+            for child in self.getChildren(elem):
+                elements.append((elem, child))
+        return elements 
+    
     
     def mutate(self):
+        print(self.seed)
+        print('=================================')
         xml = ET.fromstring(self.seed)
         
         # xmlList = self.toList(self.seed)
         # for xmlItem in xmlList:
         #     print(xmlItem)
         
+        # for x in self.levelOneElements(xml):
+        #     print(x.tag)
+        # print('====================================')
+        # for x in self.levelTwoElements(xml):
+        #     print(x.tag)
+        
+        
+        
+        # c =self.getChildren(xml)
+        # for x in c:
+        #     print(x.tag)
+        # print('====================================')
+        # for e in xml.iter():
+        #     print(e.tag)
         
         
         repetitions = randint(1, 1)
         for round in range(repetitions):
-            strategy = randint(0,0)
+            strategy = randint(3,3)
             if strategy == 0:
                 xml = self.spamElementDepth(xml)
             elif strategy == 1:
-                pass
+                xml = self.spamElementBreadth(xml)
+            elif strategy == 2:
+                xml = self.chromosomeRecombination(xml)
             elif strategy == 3:
-                pass
+                xml = self.heirarchialRecombination(xml)
         
         
         # return self.seed
