@@ -61,7 +61,7 @@ Bit flips are effective in drastically changing string values. This strategy is 
 
 
 #### **XML Fuzzer**
-Fuzzing XML input is several times more challenging than of the other input types here, because of its structure and more complicated syntax. In order to generate effective mutations, we utilised 3 main strategies, the latter two of which were inspired by CENSUS' 2015 presentation on fuzzing methods and observations. [Source](https://census-labs.com/media/choronzon-zeronights-2015.pdf)
+Fuzzing XML input is several times more challenging than of the other input types here, because of its structure and more complicated syntax. In order to generate effective mutations, we utilised 3 main strategies, the latter two of which were inspired by CENSUS' 2015 presentation on fuzzing methods and observations. See [Source](https://census-labs.com/media/choronzon-zeronights-2015.pdf).
 1.  Depth/Breadth-wise insertion of elements to potentially trigger stack overflow error in binary or XML parser
     *   nesting multiple elements
     *   creating multiple children in parent nodes
