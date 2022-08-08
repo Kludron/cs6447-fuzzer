@@ -806,7 +806,7 @@ class XML_Fuzz(Fuzz):
             xml = self.chromosomeRecombination(xml)
         elif strategy == 3:
             xml = self.heirarchialRecombination(xml)
-        mutation = ET.tostring(xml, encoding='unicode', method='xml')
+        mutation = ET.tostring(xml, encoding='utf-8', method='xml')
         return mutation
     
     def fuzz(self):
@@ -1010,7 +1010,7 @@ if __name__ == '__main__':
     mutation = fuzzer.mutate()
     print(mutation)
     
-    f = open("tests/mutated.txt", "w")
+    f = open("tests/mutated.txt", "wb")
     f.write(mutation)
     f.close()
     
