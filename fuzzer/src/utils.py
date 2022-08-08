@@ -411,6 +411,7 @@ class JSON_Fuzz(Fuzz):
             self.deleteRandomChar,
             self.insertRandomChar,
             self.flipRandomBit,
+            self.flipRandomByte,
             self.multipleStringMutations
         ]
         method = choice(methods)

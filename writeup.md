@@ -1,6 +1,6 @@
 #COMP6447 Fuzzer
 ##22T2 Major Project Submission
-###Simon Blain (z5200681) | Liam Godfrey (z5256175) | Avin Singh (z5222179) | Jin Shan (z5230926)
+###Simon Blain (z5200681) | Liam Godfrey (z5256175) | Avin Singh (z5222179) | Jin Shan Ho (z5230926)
 -------------------------------------
 ##How the fuzzer works
 The fuzzer was designed to be composed of two major parts:
