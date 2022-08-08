@@ -63,16 +63,16 @@ Bit flips are effective in drastically changing string values. This strategy is 
 #### **XML Fuzzer**
 Fuzzing XML input is several times more challenging than of the other input types here, because of its structure and more complicated syntax. In order to generate effective mutations, we utilised 3 main strategies, the latter two of which were inspired by CENSUS' 2015 presentation on fuzzing methods and observations. [Source](https://census-labs.com/media/choronzon-zeronights-2015.pdf)
 1.  Depth/Breadth-wise insertion of elements to potentially trigger stack overflow error in binary or XML parser
-*   nesting multiple elements
-*   creating multiple children in parent nodes
+    *   nesting multiple elements
+    *   creating multiple children in parent nodes
 2.  Chromosome Recombination
-*   Restructuring of XML tree
-*   addition/removal/replacement/duplication of nodes
-*   copying content from one element to another
-*   moving content from one element to another
+    *   Restructuring of XML tree
+    *   addition/removal/replacement/duplication of nodes
+    *   copying content from one element to another
+    *   moving content from one element to another
 3.  Heirarchial Recombination
-*   Restructuring of XML tree
-*   Redefining node heirarchies
+    *   Restructuring of XML tree
+    *   Redefining node heirarchies
 Implementation of these strategies and their sub-strategies can generate effective mutations. However, we observe that the need to iterate through the tree to access parent and children nodes might cause some drop in fuzzer performance.
 
 
