@@ -467,8 +467,7 @@ class XML_Fuzz(Fuzz):
         # self.root = ET.fromstring(seed)
         self.initial = seed
         print("created xml fuzzer")
-        
-        # basically the known tests
+        # basically some known tests
         self.bad_input = {
             'zero' : str(self.zero()),
             'neg': str(self.knownNeg()),
@@ -480,7 +479,14 @@ class XML_Fuzz(Fuzz):
             'int_min': str(self.intMin()),
             'randomURL': "https://aasddasfqwegqce.com",
             'fmt': '%s',
-            'empty': ''
+            'empty': '',
+            'b1': '&apos;XoiZR',
+            'b2': '&quot;XoiZR',
+            'b3': '&lt;Tnn96&gt;',
+            'b4': '&lt;?Tnn96 ?&gt;',
+            'b5': '&lt;? Tnn96 ?&gt;',
+            'b6': '&lt;% Tnn96 %&gt;',
+            'b7': '&lt;%= Tnn96 %&gt;'
         }
     def updateSeed(self, new):
         self.seed = new.replace('\n', '')
@@ -492,57 +498,6 @@ class XML_Fuzz(Fuzz):
         except ET.ParseError:
             return False
     
-    '''
-		This method separates an xml in a "line by line" form.
-		Example:
-            xmlString: "<xml a="b">f00</xml>"
-            result: [ '<xml a="b">' , 'f00', '</xml>']
-		
-		Based on Robert D. Cameron's REX/Perl 1.0.
-		Original copyright notice follows:
-		REX/Perl 1.0
-		Robert D. Cameron "REX: XML Shallow Parsing with Regular Expressions",
-		Technical Report TR 1998-17, School of Computing Science, Simon Fraser
-		University, November, 1998.
-		Copyright (c) 1998, Robert D. Cameron.
-		The following code may be freely used and distributed provided that
-		this copyright and citation notice remains intact and that modifications
-		or additions are clearly identified.
-	
-		@parameter xmlString: A string representation of the xml
-		@return: A list of strings.
-    '''
-    def toList(self, xmlString):
-        TextSE = "[^<]+"
-        UntilHyphen = "[^-]*-"
-        Until2Hyphens = UntilHyphen + "(?:[^-]" + UntilHyphen + ")*-"
-        CommentCE = Until2Hyphens + ">?"
-        UntilRSBs = "[^\\]]*](?:[^\\]]+])*]+"
-        CDATA_CE = UntilRSBs + "(?:[^\\]>]" + UntilRSBs + ")*>"
-        S = "[ \\n\\t\\r]+"
-        NameStrt = "[A-Za-z_:]|[^\\x00-\\x7F]"
-        NameChar = "[A-Za-z0-9_:.-]|[^\\x00-\\x7F]"
-        Name = "(?:" + NameStrt + ")(?:" + NameChar + ")*"
-        QuoteSE = "\"[^\"]*\"|'[^']*'"
-        DT_IdentSE = S + Name + "(?:" + S + "(?:" + Name + "|" + QuoteSE +"))*"
-        MarkupDeclCE = "(?:[^\\]\"'><]+|" + QuoteSE + ")*>"
-        S1 = "[\\n\\r\\t ]"
-        UntilQMs = "[^?]*\\?+"
-        PI_Tail = "\\?>|" + S1 + UntilQMs + "(?:[^>?]" + UntilQMs + ")*>"
-        DT_ItemSE = "<(?:!(?:--" + Until2Hyphens + ">|[^-]" + MarkupDeclCE + ")|\\?" + Name + "(?:" + PI_Tail + "))|%" + Name + ";|" + S
-        DocTypeCE = DT_IdentSE + "(?:" + S + ")?(?:\\[(?:" + DT_ItemSE + ")*](?:" + S + ")?)?>?"
-        DeclCE = "--(?:" + CommentCE + ")?|\\[CDATA\\[(?:" + CDATA_CE + ")?|DOCTYPE(?:" + DocTypeCE + ")?"
-        PI_CE = Name + "(?:" + PI_Tail + ")?"
-        EndTagCE = Name + "(?:" + S + ")?>?"
-        AttValSE = "\"[^<\"]*\"|'[^<']*'"
-        ElemTagCE = Name + "(?:" + S + Name + "(?:" + S + ")?=(?:" + S + ")?(?:" + AttValSE + "))*(?:" + S + ")?/?>?"
-        MarkupSPE = "<(?:!(?:" + DeclCE + ")?|\\?(?:" + PI_CE + ")?|/(?:" + EndTagCE + ")?|(?:" + ElemTagCE + ")?)"
-        XML_SPE = TextSE + "|" + MarkupSPE		
-
-        res = re.findall(XML_SPE, xmlString)
-        res = [ x for x in res if x !='\n' ]
-
-        return res
     
     def parseXML(self, input):  # assumes that input is valid xml
         self.root = ET.fromstring(input)     # this function gives the root element of xml tree
@@ -561,19 +516,13 @@ class XML_Fuzz(Fuzz):
     # return a list of all children of element
     def getChildren(self, elem):
         return list(elem)
-    # return a random element from list
-    def pickRandomElement(self, elems):
-        return choice(elems)
     # check if element has children
     def hasChild(self, elem):
         return True if len(list(elem)) else False
     # get element attributes as tuples (key, value)
     def getAttributes(self, elem):  # returns 
         return elem.items()
-    # set element attribute to (key, value)
-    def setAttribute(self, elem, key, value):
-        elem.set(key, value)
-        return elem
+
     
     # only called once to try stack overflow. 
     # unfortunately doesnt cause any issues for all binaries, wasted my time
@@ -585,18 +534,7 @@ class XML_Fuzz(Fuzz):
         add = ET.fromstring(new_el)
         mutation.insert(0,add)
         return mutation
-    
-    def mutateText(self, elem):
-        avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
-        if elem.tag not in avoid:
-            elem.text = "fuck"
-        return elem
-    
-    def addElement(self, root):
-        new = ET.Element("NewNode")
-        root.append(new)
-        return root
-    
+   
     
     # get duplicate of an element, but without its children nodes
     def cloneElement(self, elem):
@@ -623,11 +561,11 @@ class XML_Fuzz(Fuzz):
         elem1 = choice(elements)
         elements.remove(elem1)
         elem2 = choice(elements)
-        print("e1: ", elem1)
-        print("e2: ", elem2)
+        # print("e1: ", elem1)
+        # print("e2: ", elem2)
         
         root = child = elem2
-        for i in range(randint(1, 128)):        # no point going too deep
+        for i in range(randint(1, 20)):        # no point going too deep
             root = self.cloneElement(child)     # create clone
             root.append(child)                  # append clone to root
             child = root                        # set child as root
@@ -648,14 +586,14 @@ class XML_Fuzz(Fuzz):
         elem1 = choice(elements)
         elements.remove(elem1)
         elem2 = choice(elements)
-        print("e1: ", elem1)
-        print("e2: ", elem2)
+        # print("e1: ", elem1)
+        # print("e2: ", elem2)
         
         mutation = tree
         for elem in mutation:
             if elem.tag == elem1.tag:
                 clone = self.cloneElement(elem2)
-                for i in range(randint(1, 128)): 
+                for i in range(randint(1, 20)): 
                     elem.append(clone)
         return tree 
 
@@ -667,6 +605,103 @@ class XML_Fuzz(Fuzz):
     '''
     def chromosomeRecombination(self, tree):
         mutation = tree
+        strategy = randint(0, 6)
+        if strategy == 0:
+            # copy children from one to another
+            l2_elems = self.levelTwoElements(tree)
+            parent, child = choice(l2_elems)
+            l1_elems = self.levelOneElements(tree)
+            l1_elems.remove(parent)
+            dest = choice(l1_elems)
+            # print("C-0")
+            # print("pair: ", parent, child)
+            # print("dst: ", dest)
+            count = 0
+            for elem in mutation.iter():
+                if elem == dest:
+                    try:
+                        dest.append(child)
+                        break
+                    except:
+                        continue
+        if strategy == 1:
+            # remove elements
+            # print("C-1")
+            l1_elems = self.levelOneElements(tree)
+            target = choice(l1_elems)
+            # print("remove: ", target)
+            mutation.remove(target)
+        if strategy == 2:
+            # duplicate contents
+            # print("C-2")
+            l2_elems = self.levelTwoElements(tree)
+            parent, _ = choice(l2_elems)
+            # print("Parent: ", parent)
+            children = self.getChildren(parent)
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        for child in children:
+                            parent.append(child)
+                        break
+                    except:
+                        continue
+        if strategy == 3:
+            # fuzz text of random element based on bad input or random string
+            # print("C-3")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
+            if target.tag not in avoid:
+                
+                if randint(0, 1) == 0:
+                    text = choice(list(self.bad_input.values()))
+                else:
+                    text = self.generateString()
+                target.text = text
+                # print("target: ", target)
+                # print("text: ", text)
+        if strategy == 4:
+            # fuzz the attribute value of random element
+            # print("C-4")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            attributes = target.items()
+            for attr in attributes:
+                newAttr = choice(list(self.bad_input.values()))
+                target.set(attr[0], newAttr)
+        if strategy == 5:
+            # add attribute to random element
+            # print("C-5")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            attributes = target.items()
+            for attr in attributes:
+                if randint(0, 1) == 0:
+                    key = choice(list(self.bad_input.values()))
+                else:
+                    key = self.generateString()
+                if randint(0, 1) == 0:
+                    val = choice(list(self.bad_input.values()))
+                else:
+                    val = self.generateString()   
+                target.set(key, val)
+        if strategy == 6:
+            # insert bad elements?
+            # print("C-6")
+            bad = [
+                '<div class="no_add" id="yes"><a class="no_add" href="http://google.com">Here is some link...</a><link class="no_add" href="http://somewebsite.com" /><span class="no_add">text</span></div>',
+                '<span class="no_add" id="wot">fuzz me</span>',
+                '<format_string class="no_add">%s</format_string>',
+                '<trivial class="no_add" id="trivial">trivial</trivial>',
+                '<div class="no_add" id="fuzz_me" data="fuzz_me" name="fuzz_me"></div>'
+            ]
+            elemstr = choice(bad)
+            # print(elemstr)
+            new = ET.fromstring(elemstr)
+            elements = list(elem for elem in mutation.iter())
+            target = choice(elements)
+            target.append(new)
         return mutation
 
 
@@ -680,22 +715,19 @@ class XML_Fuzz(Fuzz):
         l2_elems = self.levelTwoElements(tree)
         strategy = randint(1, 1)
         if strategy == 0:
-            print("H-0")
+            # print('H-0')
             parent, child = choice(l2_elems)
-            print("pair: ", parent, child)
             for elem in mutation.iter():
                 if elem == parent:
                     try:
                         parent.remove(child)
-                        print("removed")
+                        break
                     except:
                         continue
             mutation.append(child)
-            
         if strategy == 1:
-            print("H-1")
+            # print("H-1")
             parent, child = choice(l2_elems)
-            print("pair: ", parent, child)
             pos = -1
             count = 0
             for elem in mutation.iter():
@@ -704,10 +736,10 @@ class XML_Fuzz(Fuzz):
                         parent.remove(child)
                         mutation.remove(parent)
                         pos = count
+                        break
                     except:
                         continue
-                else :
-                    count += 1
+                count += 1
             child.append(parent)
             mutation.insert(pos-1, child)     # insert the new child node to where the old parent node used to be
         return mutation # can't believe this works
@@ -731,63 +763,38 @@ class XML_Fuzz(Fuzz):
     
     
     def mutate(self):
-        print(self.seed)
-        print('=================================')
         xml = ET.fromstring(self.seed)
+        mutation = self.seed
         
-        # xmlList = self.toList(self.seed)
-        # for xmlItem in xmlList:
-        #     print(xmlItem)
-        
-        # for x in self.levelOneElements(xml):
-        #     print(x.tag)
-        # print('====================================')
-        # for x in self.levelTwoElements(xml):
-        #     print(x.tag)
-        
-        
-        
-        # c =self.getChildren(xml)
-        # for x in c:
-        #     print(x.tag)
-        # print('====================================')
-        # for e in xml.iter():
-        #     print(e.tag)
-        
-        
-        repetitions = randint(1, 1)
-        for round in range(repetitions):
-            strategy = randint(3,3)
-            if strategy == 0:
-                xml = self.spamElementDepth(xml)
-            elif strategy == 1:
-                xml = self.spamElementBreadth(xml)
-            elif strategy == 2:
-                xml = self.chromosomeRecombination(xml)
-            elif strategy == 3:
-                xml = self.heirarchialRecombination(xml)
-        
-        
-        # return self.seed
+        # repetitions = randint(1, 10)
+        # for round in range(repetitions):
+        #     strategy = randint(0, 3)
+        #     print(strategy)
+        #     if strategy == 0:
+        #         xml = self.spamElementDepth(xml)
+        #     elif strategy == 1:
+        #         xml = self.spamElementBreadth(xml)
+        #     elif strategy == 2:
+        #         xml = self.chromosomeRecombination(xml)
+        #     elif strategy == 3:
+        #         xml = self.heirarchialRecombination(xml)
 
+        strategy = randint(0, 3)
+        if strategy == 0:
+            xml = self.spamElementDepth(xml)
+        elif strategy == 1:
+            xml = self.spamElementBreadth(xml)
+        elif strategy == 2:
+            xml = self.chromosomeRecombination(xml)
+        elif strategy == 3:
+            xml = self.heirarchialRecombination(xml)
         mutation = ET.tostring(xml, encoding='unicode', method='xml')
-        # print(mutation)
         return mutation
     
     def fuzz(self):
-        print(self.seed)
         return self.mutate()
 
     
-
-
-
-
-
-
-
-
-
 
 
 
@@ -987,7 +994,7 @@ if __name__ == '__main__':
     fuzzer = getType(sys.argv[1])
     
     mutation = fuzzer.mutate()
-    print(mutation)
+    # print(mutation)
     
     
     # f = open("tests/mutated.txt", "wb+")
