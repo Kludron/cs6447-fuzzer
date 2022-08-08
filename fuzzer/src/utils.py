@@ -444,21 +444,355 @@ class JSON_Fuzz(Fuzz):
         else:
             return self.fuzz()
 
+# # XML Fuzzer
+# class XML_Fuzz(Fuzz):
+#     def __init__(self, seed):  
+#         super().__init__(seed)
+#     def checkType(self):
+#         try:
+#             ElementTree.fromstring(self.seed)
+#             return True
+#         except ElementTree.ParseError:
+#             return False
+#     def mutate():
+#         pass
+#     def fuzz(self):
+#         # Placeholder
+#         return super().fuzz()
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
-    def __init__(self, seed):  
-        super().__init__(seed)
+    def __init__(self, seed):
+        tmp = seed.replace("\n", '')    # remove newline characters. does not affect xml validity
+        super().__init__(tmp)
+        # self.root = ET.fromstring(seed)
+        self.initial = seed
+        print("created xml fuzzer")
+        # basically some known tests
+        self.bad_input = {
+            'zero' : str(self.zero()),
+            'neg': str(self.knownNeg()),
+            'large_neg' : str(self.knownLargeNegInt()),
+            'large_pos' :str(self.knownLargePosInt),
+            'larger_neg': str(self.intUnderflow()),
+            'larger_pos': str(self.intOverflow()),
+            'int_max': str(self.intMax()),
+            'int_min': str(self.intMin()),
+            'randomURL': "https://aasddasfqwegqce.com",
+            'fmt': '%s',
+            'empty': '',
+            'b1': '&apos;XoiZR',
+            'b2': '&quot;XoiZR',
+            'b3': '&lt;Tnn96&gt;',
+            'b4': '&lt;?Tnn96 ?&gt;',
+            'b5': '&lt;? Tnn96 ?&gt;',
+            'b6': '&lt;% Tnn96 %&gt;',
+            'b7': '&lt;%= Tnn96 %&gt;'
+        }
+    def updateSeed(self, new):
+        self.seed = new.replace('\n', '')
+    
     def checkType(self):
         try:
-            ElementTree.fromstring(self.seed)
+            ET.fromstring(self.seed)
             return True
-        except ElementTree.ParseError:
+        except ET.ParseError:
             return False
-    def mutate():
-        pass
+    
+    
+    def parseXML(self, input):  # assumes that input is valid xml
+        self.root = ET.fromstring(input)     # this function gives the root element of xml tree
+        print("root: ", self.root)
+        for child in self.root:              # iterate through all children nodes
+            child.text = "fuck"
+            print(child, " tag: ", child.tag, "text: ", child.text)
+            for attr in self.getAttributes(child):
+                print("     >>", attr)
+
+        for x in self.root.iter():
+            print(x)
+        return
+
+
+    # return a list of all children of element
+    def getChildren(self, elem):
+        return list(elem)
+    # check if element has children
+    def hasChild(self, elem):
+        return True if len(list(elem)) else False
+    # get element attributes as tuples (key, value)
+    def getAttributes(self, elem):  # returns 
+        return elem.items()
+
+    
+    # only called once to try stack overflow. 
+    # unfortunately doesnt cause any issues for all binaries, wasted my time
+    def spamElements(self, root):
+        mutation = root
+        opening = f"\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n<SPAM>\n"
+        closing = f"</SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n</SPAM>\n</SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n </SPAM>\n</SPAM>\n"
+        new_el = opening*82 + closing*82
+        add = ET.fromstring(new_el)
+        mutation.insert(0,add)
+        return mutation
+   
+    
+    # get duplicate of an element, but without its children nodes
+    def cloneElement(self, elem):
+        # create element with same tag
+        clone = ET.Element(elem.tag) 
+        # copy attributes
+        attrs = self.getAttributes(elem)
+        for (key, val) in attrs:
+            clone.set(key, val)
+        # copy text
+        clone.text = elem.text
+        # copy tail
+        clone.tail = elem.tail
+        return clone
+    
+    
+    '''
+        Select (elem1, elem2) from tree; elem1 is the parent and elem2 is the child
+        child is recursively added to itself to create a tree
+        then add the tree to the parent
+    '''
+    def spamElementDepth(self, tree):
+        elements = self.getChildren(tree)
+        elem1 = choice(elements)
+        elements.remove(elem1)
+        elem2 = choice(elements)
+        # print("e1: ", elem1)
+        # print("e2: ", elem2)
+        
+        root = child = elem2
+        for i in range(randint(1, 20)):        # no point going too deep
+            root = self.cloneElement(child)     # create clone
+            root.append(child)                  # append clone to root
+            child = root                        # set child as root
+        
+        mutation = tree
+        for elem in mutation:
+            if elem.tag == elem1.tag:
+                elem.append(root)
+        return mutation
+
+
+    '''
+        Select (elem1, elem2) from tree; elem1 is the parent and elem2 is the child
+        child is added to parent multiple times
+    '''
+    def spamElementBreadth(self, tree):
+        elements = self.getChildren(tree)
+        elem1 = choice(elements)
+        elements.remove(elem1)
+        elem2 = choice(elements)
+        # print("e1: ", elem1)
+        # print("e2: ", elem2)
+        
+        mutation = tree
+        for elem in mutation:
+            if elem.tag == elem1.tag:
+                clone = self.cloneElement(elem2)
+                for i in range(randint(1, 20)): 
+                    elem.append(clone)
+        return tree 
+
+    '''
+        Restructuring of elements
+        - add/remove/replace/duplicate/shuffle content(s) in element
+        - add contents from one element to another
+        - move contents from one element to another
+    '''
+    def chromosomeRecombination(self, tree):
+        mutation = tree
+        strategy = randint(0, 6)
+        if strategy == 0:
+            # copy children from one to another
+            l2_elems = self.levelTwoElements(tree)
+            parent, child = choice(l2_elems)
+            l1_elems = self.levelOneElements(tree)
+            l1_elems.remove(parent)
+            dest = choice(l1_elems)
+            # print("C-0")
+            # print("pair: ", parent, child)
+            # print("dst: ", dest)
+            count = 0
+            for elem in mutation.iter():
+                if elem == dest:
+                    try:
+                        dest.append(child)
+                        break
+                    except:
+                        continue
+        if strategy == 1:
+            # remove elements
+            # print("C-1")
+            l1_elems = self.levelOneElements(tree)
+            target = choice(l1_elems)
+            # print("remove: ", target)
+            mutation.remove(target)
+        if strategy == 2:
+            # duplicate contents
+            # print("C-2")
+            l2_elems = self.levelTwoElements(tree)
+            parent, _ = choice(l2_elems)
+            # print("Parent: ", parent)
+            children = self.getChildren(parent)
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        for child in children:
+                            parent.append(child)
+                        break
+                    except:
+                        continue
+        if strategy == 3:
+            # fuzz text of random element based on bad input or random string
+            # print("C-3")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            avoid = ['root', 'html', 'body', 'head', 'tail', 'link', 'div']
+            if target.tag not in avoid:
+                
+                if randint(0, 1) == 0:
+                    text = choice(list(self.bad_input.values()))
+                else:
+                    text = self.generateString()
+                target.text = text
+                # print("target: ", target)
+                # print("text: ", text)
+        if strategy == 4:
+            # fuzz the attribute value of random element
+            # print("C-4")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            attributes = target.items()
+            for attr in attributes:
+                newAttr = choice(list(self.bad_input.values()))
+                target.set(attr[0], newAttr)
+        if strategy == 5:
+            # add attribute to random element
+            # print("C-5")
+            elements = self.levelOneElements(tree)
+            target = choice(elements)
+            attributes = target.items()
+            for attr in attributes:
+                if randint(0, 1) == 0:
+                    key = choice(list(self.bad_input.values()))
+                else:
+                    key = self.generateString()
+                if randint(0, 1) == 0:
+                    val = choice(list(self.bad_input.values()))
+                else:
+                    val = self.generateString()   
+                target.set(key, val)
+        if strategy == 6:
+            # insert bad elements?
+            # print("C-6")
+            bad = [
+                '<div class="no_add" id="yes"><a class="no_add" href="http://google.com">Here is some link...</a><link class="no_add" href="http://somewebsite.com" /><span class="no_add">text</span></div>',
+                '<span class="no_add" id="wot">fuzz me</span>',
+                '<format_string class="no_add">%s</format_string>',
+                '<trivial class="no_add" id="trivial">trivial</trivial>',
+                '<div class="no_add" id="fuzz_me" data="fuzz_me" name="fuzz_me"></div>'
+            ]
+            elemstr = choice(bad)
+            # print(elemstr)
+            new = ET.fromstring(elemstr)
+            elements = list(elem for elem in mutation.iter())
+            target = choice(elements)
+            target.append(new)
+        return mutation
+
+
+    '''
+        Restructuring of element heirarchy
+        - child go up one level
+        - child swap with parent
+    '''
+    def heirarchialRecombination(self, tree):
+        mutation = tree
+        l2_elems = self.levelTwoElements(tree)
+        strategy = randint(1, 1)
+        if strategy == 0:
+            # print('H-0')
+            parent, child = choice(l2_elems)
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        parent.remove(child)
+                        break
+                    except:
+                        continue
+            mutation.append(child)
+        if strategy == 1:
+            # print("H-1")
+            parent, child = choice(l2_elems)
+            pos = -1
+            count = 0
+            for elem in mutation.iter():
+                if elem == parent:
+                    try:
+                        parent.remove(child)
+                        mutation.remove(parent)
+                        pos = count
+                        break
+                    except:
+                        continue
+                count += 1
+            child.append(parent)
+            mutation.insert(pos-1, child)     # insert the new child node to where the old parent node used to be
+        return mutation # can't believe this works
+
+    
+    '''
+        Get elements
+    '''
+    def levelOneElements(self, root):
+        return self.getChildren(root)
+    '''
+        Get single nested elements
+        returns tuple (parent, child)
+    '''
+    def levelTwoElements(self, root):
+        elements = []
+        for elem in self.getChildren(root):
+            for child in self.getChildren(elem):
+                elements.append((elem, child))
+        return elements 
+    
+    
+    def mutate(self):
+        xml = ET.fromstring(self.seed)
+        mutation = self.seed
+        
+        # repetitions = randint(1, 10)
+        # for round in range(repetitions):
+        #     strategy = randint(0, 3)
+        #     print(strategy)
+        #     if strategy == 0:
+        #         xml = self.spamElementDepth(xml)
+        #     elif strategy == 1:
+        #         xml = self.spamElementBreadth(xml)
+        #     elif strategy == 2:
+        #         xml = self.chromosomeRecombination(xml)
+        #     elif strategy == 3:
+        #         xml = self.heirarchialRecombination(xml)
+
+        strategy = randint(0, 3)
+        if strategy == 0:
+            xml = self.spamElementDepth(xml)
+        elif strategy == 1:
+            xml = self.spamElementBreadth(xml)
+        elif strategy == 2:
+            xml = self.chromosomeRecombination(xml)
+        elif strategy == 3:
+            xml = self.heirarchialRecombination(xml)
+        mutation = ET.tostring(xml, encoding='unicode', method='xml')
+        return mutation
+    
     def fuzz(self):
-        # Placeholder
-        return super().fuzz()
+        return self.mutate()
 
 # Plaintext Fuzzer. No need to overwrite checkType()
 class Plaintext_Fuzz(Fuzz):
