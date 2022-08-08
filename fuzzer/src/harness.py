@@ -140,12 +140,14 @@ class Harness():
                                 self.c_semaphore.release()
                                 # Verify the payload with recreation
                                 fuzzInput, signal = payload
-                                subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                                #subprocess.run(self.program, input=fuzzInput, check=True, capture_output=False, stderr=None, stdout=None, text=True)
+                                subprocess.run(self.program, input=fuzzInput, check=True, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
                                 self.LOGFILE.write(fuzzInput+'\n...\n')
                             except (ValueError):
                                 pass
                     else:
-                        subprocess.run(self.program, input=fuzzInput, check=True, stdout=PIPE, text=True)
+                        #subprocess.run(self.program, input=fuzzInput, check=True, capture_output=False, stdout=None, text=True)
+                        subprocess.run(self.program, input=fuzzInput, check=True, capture_output=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
                         self.LOGFILE.write(fuzzInput+'\n...\n')
 
 
