@@ -6,7 +6,7 @@ import sys
 import json
 import math
 from tkinter import E
-import xml.etree.ElementTree as ElementTree
+import xml.etree.ElementTree as ET
 # from pwn import *
 import copy
 from random import choice, randint, uniform
@@ -978,7 +978,7 @@ def getType(filename) -> Fuzz or None:
         fuzzer = JSON_Fuzz(inputTxt)
     elif type == TYPE_XML:
         print("getType() - Detected XML")
-        # XML_Fuzz.fuzz(inputTxt)
+        fuzzer = XML_Fuzz(inputTxt)
     elif type == TYPE_PLAINTEXT:
         print("getType() - Detected Plaintext")
         # Plaintext_Fuzz.fuzz(inputTxt)
@@ -990,9 +990,9 @@ def getType(filename) -> Fuzz or None:
 if __name__ == '__main__':
     fuzzer = getType(sys.argv[1])
     mutation = fuzzer.mutate()
-    # print(mutation)
+    print(mutation)
     
-    f = open("tests/mutated.txt", "wb+")
+    f = open("tests/mutated.txt", "w")
     f.write(mutation)
     f.close()
     
