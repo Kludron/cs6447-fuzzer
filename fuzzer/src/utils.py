@@ -96,44 +96,6 @@ class Fuzz():
     def intMin(self):
         return 0x80000000
     
-    '''
-        Magic bytes which often cause errors
-    '''
-    def mutate_magic(self, data):
-        # tuple = (byte-size of value, value)
-        values = [
-            (1, 0xff),
-            (1, 0x7f),
-            (1, 0),
-            (2, 0xffff),
-            (2, 0),
-            (4, 0xffffffff),
-            (4, 0),
-            (4, 0x80000000),
-            (4, 0x40000000),
-	        (4, 0x7fffffff)
-        ]
-        length = len(data) - 8  # make sure we dont write over the EOI marker
-        idx = randint(0, length)
-        n_size, n = choice(values)
-        data[idx:idx + n_size] = bytearray(n)
-        
-    '''
-        Boolean
-    '''
-    def setTrue(self):
-        return True
-    def setFalse(self):
-        return False
-    def flipBool(self, val):
-        return not val
-    
-    '''
-        Null
-    '''
-    def setNull(self):
-        return None
-    
     
     '''
         Random String mutators
