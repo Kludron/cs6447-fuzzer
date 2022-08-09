@@ -406,21 +406,7 @@ class JSON_Fuzz(Fuzz):
         else:
             return self.fuzz()
 
-# # XML Fuzzer
-# class XML_Fuzz(Fuzz):
-#     def __init__(self, seed):  
-#         super().__init__(seed)
-#     def checkType(self):
-#         try:
-#             ElementTree.fromstring(self.seed)
-#             return True
-#         except ElementTree.ParseError:
-#             return False
-#     def mutate():
-#         pass
-#     def fuzz(self):
-#         # Placeholder
-#         return super().fuzz()
+
 # XML Fuzzer
 class XML_Fuzz(Fuzz):
     def __init__(self, seed):
@@ -751,7 +737,6 @@ class JPG_Fuzz(Fuzz):
     def __init__(self, seed):
         super().__init__(seed)
         # print("created jpg fuzzer")
-    # I'm guessing we need to use bit flipping for this one
     def mutate(self):
         strategy = randint(0, 100)
         if strategy < 20:
@@ -768,7 +753,6 @@ class JPG_Fuzz(Fuzz):
             ratio = uniform(0.00001, 0.0001)
             mutation = self.flipRatioBytes(self.seed, ratio)
         return mutation
-        # return self.seed
     
     # replace with magic byte
     def mutate_magic(self, data):
@@ -789,20 +773,18 @@ class JPG_Fuzz(Fuzz):
         idx = randint(0, length)
         n_size, n = choice(values)
         # print("magic mutate: ", idx, hex(n), n_size)
-        # data[idx:idx + n_size] = bytearray(n)
-        # return data
         if n_size == 1:
-            if n == 0xff:			# 0xFF
-                data[idx] = 0xff
-            elif n == 0x7f:		# 0x7F
+            if n == 0xff:			    # 0xFF
+                data[idx] = 0xff        
+            elif n == 0x7f:		        # 0x7F
                 data[idx] = 0x7f
-            elif n == 0:			# 0x00
+            elif n == 0:			    # 0x00
                 data[idx] = 0
         elif n_size == 2:
-            if n == 0xffff:			# 0xFFFF
+            if n == 0xffff:			    # 0xFFFF
                 data[idx] = 0xff
                 data[idx + 1] = 0xff
-            elif n == 0:			# 0x0000
+            elif n == 0:			    # 0x0000
                 data[idx] = 0
                 data[idx + 1] = 0
         elif n_size == 4:
@@ -811,7 +793,7 @@ class JPG_Fuzz(Fuzz):
                 data[idx + 1] = 0xff
                 data[idx + 2] = 0xff
                 data[idx + 3] = 0xff
-            elif n == 0:			# 0x00000000
+            elif n == 0:			    # 0x00000000
                 data[idx] = 0
                 data[idx + 1] = 0
                 data[idx + 2] = 0
@@ -821,7 +803,7 @@ class JPG_Fuzz(Fuzz):
                 data[idx + 1] = 0
                 data[idx + 2] = 0
                 data[idx + 3] = 0
-            elif n == 0x40000000:			# 0x40000000
+            elif n == 0x40000000:		# 0x40000000
                 data[idx] = 0x40
                 data[idx + 1] = 0
                 data[idx + 2] = 0
