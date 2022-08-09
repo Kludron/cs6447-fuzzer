@@ -464,7 +464,6 @@ class XML_Fuzz(Fuzz):
     def __init__(self, seed):
         tmp = seed.replace("\n", '')    # remove newline characters. does not affect xml validity
         super().__init__(tmp)
-        # self.root = ET.fromstring(seed)
         self.initial = seed
         # basically some known tests
         self.bad_input = {
@@ -496,21 +495,6 @@ class XML_Fuzz(Fuzz):
             return True
         except ET.ParseError:
             return False
-    
-    
-    def parseXML(self, input):  # assumes that input is valid xml
-        self.root = ET.fromstring(input)     # this function gives the root element of xml tree
-        print("root: ", self.root)
-        for child in self.root:              # iterate through all children nodes
-            child.text = "fuck"
-            print(child, " tag: ", child.tag, "text: ", child.text)
-            for attr in self.getAttributes(child):
-                print("     >>", attr)
-
-        for x in self.root.iter():
-            print(x)
-        return
-
 
     # return a list of all children of element
     def getChildren(self, elem):
@@ -560,9 +544,6 @@ class XML_Fuzz(Fuzz):
         elem1 = choice(elements)
         elements.remove(elem1)
         elem2 = choice(elements)
-        # print("e1: ", elem1)
-        # print("e2: ", elem2)
-        
         root = child = elem2
         for i in range(randint(1, 20)):        # no point going too deep
             root = self.cloneElement(child)     # create clone
@@ -584,10 +565,7 @@ class XML_Fuzz(Fuzz):
         elements = self.getChildren(tree)
         elem1 = choice(elements)
         elements.remove(elem1)
-        elem2 = choice(elements)
-        # print("e1: ", elem1)
-        # print("e2: ", elem2)
-        
+        elem2 = choice(elements)        
         mutation = tree
         for elem in mutation:
             if elem.tag == elem1.tag:
@@ -669,8 +647,6 @@ class XML_Fuzz(Fuzz):
                     else:
                         text = self.generateString()
                     target.text = text
-                # print("target: ", target)
-                # print("text: ", text)
         if strategy == 4:
             # fuzz the attribute value of random element
             # print("C-4")
@@ -783,20 +759,6 @@ class XML_Fuzz(Fuzz):
     def mutate(self):
         xml = ET.fromstring(self.seed)
         mutation = self.seed
-        
-        # repetitions = randint(1, 10)
-        # for round in range(repetitions):
-        #     strategy = randint(0, 3)
-        #     print(strategy)
-        #     if strategy == 0:
-        #         xml = self.spamElementDepth(xml)
-        #     elif strategy == 1:
-        #         xml = self.spamElementBreadth(xml)
-        #     elif strategy == 2:
-        #         xml = self.chromosomeRecombination(xml)
-        #     elif strategy == 3:
-        #         xml = self.heirarchialRecombination(xml)
-
         strategy = randint(0, 3)
         if strategy == 0:
             xml = self.spamElementDepth(xml)
@@ -806,8 +768,6 @@ class XML_Fuzz(Fuzz):
             xml = self.chromosomeRecombination(xml)
         elif strategy == 3:
             xml = self.heirarchialRecombination(xml)
-        # mutation = ET.tostring(xml, encoding=str, method='xml')
-        # mutation = ET.tostring(xml, encoding = 'unicode', method='text')
         mutation = ET.tostring(xml, encoding = 'unicode')
         return mutation
     
@@ -828,7 +788,7 @@ class Plaintext_Fuzz(Fuzz):
 class JPG_Fuzz(Fuzz):
     def __init__(self, seed):
         super().__init__(seed)
-        print("created jpg fuzzer")
+        # print("created jpg fuzzer")
     # I'm guessing we need to use bit flipping for this one
     def mutate(self):
         strategy = randint(0, 100)
@@ -866,7 +826,7 @@ class JPG_Fuzz(Fuzz):
         length = len(data) - 8  # make sure we dont write over the EOI marker
         idx = randint(0, length)
         n_size, n = choice(values)
-        print("magic mutate: ", idx, hex(n), n_size)
+        # print("magic mutate: ", idx, hex(n), n_size)
         # data[idx:idx + n_size] = bytearray(n)
         # return data
         if n_size == 1:
@@ -915,7 +875,7 @@ class JPG_Fuzz(Fuzz):
     def flipRatioBits(self, data, ratio):
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         num_of_flips = int(length * ratio)
-        print("flip bits ratio: ", ratio, num_of_flips)
+        # print("flip bits ratio: ", ratio, num_of_flips)
         indexes = []
         flip_array = [1,2,4,8,16,32,64,128]
         while len(indexes) < num_of_flips:
@@ -926,7 +886,7 @@ class JPG_Fuzz(Fuzz):
         return data
     
     def flipRandomBit(self, data):
-        print("flip single bit")
+        # print("flip single bit")
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         idx = randint(0, length)
         flip_array = [1,2,4,8,16,32,64,128]
@@ -934,7 +894,7 @@ class JPG_Fuzz(Fuzz):
         data[idx] = data[idx] ^ mask
         return data
     def flipRandomByte(self, data):
-        print("flip single byte")
+        # print("flip single byte")
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         idx = randint(0, length)
         data[idx] = data[idx] ^ 0xff
@@ -942,7 +902,7 @@ class JPG_Fuzz(Fuzz):
     def flipRatioBytes(self, data, ratio):
         length = len(data) - 4 #jpg file format requires SOI and EOI which are the first 2 and last 2 bytes. We don't want to touch them
         num_of_flips = int(length * ratio)
-        print("flip ratio bytes", ratio*100, num_of_flips)
+        # print("flip ratio bytes", ratio*100, num_of_flips)
         indexes = set()
         while len(indexes) < num_of_flips:
             indexes.add(randint(0, length))
